@@ -7,8 +7,8 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS) $(GPROF_LDFLAGS) $(SANITIZER_LDFLAGS)
-AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS) $(GPROF_CXXFLAGS) $(SANITIZER_CXXFLAGS)
-AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
+AM_CXXFLAGS = $(DEBUG_CXXFLAGS) $(HARDENED_CXXFLAGS) $(WARN_CXXFLAGS) $(NOWARN_CXXFLAGS) $(ERROR_CXXFLAGS) $(GPROF_CXXFLAGS) $(SANITIZER_CXXFLAGS)
+AM_CPPFLAGS = $(DEBUG_CPPFLAGS) $(HARDENED_CPPFLAGS)
 AM_LIBTOOLFLAGS = --preserve-dup-deps
 PTHREAD_FLAGS = $(PTHREAD_CFLAGS) $(PTHREAD_LIBS)
 EXTRA_LIBRARIES =
@@ -107,6 +107,14 @@ BENCHMARKS =
 
 if BUILD_BITCOIND
   bin_PROGRAMS += yerbasd
+endif
+
+if BUILD_BITCOIN_CLI
+  bin_PROGRAMS += yerbas-cli
+endif
+
+if BUILD_BITCOIN_TX
+  bin_PROGRAMS += yerbas-tx
 endif
 
 if BUILD_BITCOIN_UTILS
@@ -221,6 +229,7 @@ BITCOIN_CORE_H = \
   policy/feerate.h \
   policy/fees.h \
   policy/policy.h \
+  policy/rbf.h \
   pow.h \
   protocol.h \
   random.h \
@@ -267,10 +276,15 @@ BITCOIN_CORE_H = \
   wallet/coincontrol.h \
   wallet/crypter.h \
   wallet/db.h \
+  wallet/feebumper.h \
+  wallet/fees.h \
+  wallet/init.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
   wallet/walletdb.h \
   warnings.h \
+  wallet/bip39.h \
+  wallet/bip39_english.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -303,6 +317,7 @@ libyerbas_server_a_SOURCES = \
   blockencodings.cpp \
   chain.cpp \
   checkpoints.cpp \
+  consensus/consensus.cpp \
   consensus/tx_verify.cpp \
   dsnotificationinterface.cpp \
   evo/cbtx.cpp \
@@ -349,6 +364,7 @@ libyerbas_server_a_SOURCES = \
   noui.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
+  policy/rbf.cpp \
   pow.cpp \
   privatesend/privatesend.cpp \
   privatesend/privatesend-server.cpp \
@@ -361,8 +377,10 @@ libyerbas_server_a_SOURCES = \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
+  rpc/rewards.cpp \
   rpc/rpcevo.cpp \
   rpc/rpcquorums.cpp \
+  rpc/safemode.cpp \
   rpc/server.cpp \
   rpc/privatesend.cpp \
   script/sigcache.cpp \
@@ -402,6 +420,10 @@ libyerbas_wallet_a_SOURCES = \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
+  wallet/feebumper.cpp \
+  wallet/fees.cpp \
+  wallet/init.cpp \
+
   $(BITCOIN_CORE_H)
 
 # crypto primitives library
@@ -447,6 +469,7 @@ crypto_libyerbas_crypto_base_a_SOURCES = \
   crypto/sha256.cpp \
   crypto/sha256.h \
   crypto/sha512.h \
+  crypto/sha512.cpp \
   crypto/sph_blake.h \
   crypto/sph_bmw.h \
   crypto/sph_cubehash.h \
@@ -552,13 +575,18 @@ libyerbas_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
+  support/cleanse.h \
+  support/cleanse.cpp \
   streams.h \
   tinyformat.h \
   uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
-  version.h
+  version.h \
+  LibBoolEE.cpp \
+  LibBoolEE.h \
+  $(BITCOIN_CORE_H)
 
 # common: shared between yerbasd, and yerbas-qt and non-server tools
 libyerbas_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)

@@ -11,6 +11,7 @@ SUBDIRS += doc/man
 endif
 .PHONY: deploy FORCE
 
+override GZIP_ENV = "-9n"
 export PYTHONPATH
 
 if BUILD_BITCOIN_LIBS
@@ -22,6 +23,7 @@ BITCOIND_BIN=$(top_builddir)/src/$(BITCOIN_DAEMON_NAME)$(EXEEXT)
 BITCOIN_QT_BIN=$(top_builddir)/src/qt/$(BITCOIN_GUI_NAME)$(EXEEXT)
 BITCOIN_CLI_BIN=$(top_builddir)/src/$(BITCOIN_CLI_NAME)$(EXEEXT)
 BITCOIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EXEEXT)
+BITCOIN_CLI_INSTALL=$(top_builddir)/contrib/install_cli.sh
 
 empty :=
 space := $(empty) $(empty)
@@ -43,7 +45,8 @@ DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 DIST_CONTRIB = $(top_srcdir)/contrib/yerbas-cli.bash-completion \
 	       $(top_srcdir)/contrib/yerbas-tx.bash-completion \
 	       $(top_srcdir)/contrib/yerbasd.bash-completion \
-	       $(top_srcdir)/contrib/init
+	       $(top_srcdir)/contrib/init \
+		   $(top_srcdir)/contrib/rpm
 DIST_SHARE = \
   $(top_srcdir)/share/genbuild.sh \
   $(top_srcdir)/share/rpcauth
@@ -95,6 +98,10 @@ $(OSX_APP)/Contents/Resources/yerbas.icns: $(OSX_INSTALLER_ICONS)
 	$(MKDIR_P) $(@D)
 	$(INSTALL_DATA) $< $@
 
+$(OSX_APP)/Contents/MacOS/install_cli.sh: $(BITCOIN_CLI_INSTALL)
+	$(MKDIR_P) $(@D)
+	$(INSTALL_DATA) $< $@
+
 $(OSX_APP)/Contents/MacOS/Yerbas-Qt: all-recursive
 	$(MKDIR_P) $(@D)
 	STRIPPROG="$(STRIP)" $(INSTALL_STRIP_PROGRAM)  $(BITCOIN_QT_BIN) $@
@@ -113,14 +120,15 @@ $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings:
 
 OSX_APP_BUILT=$(OSX_APP)/Contents/PkgInfo $(OSX_APP)/Contents/Resources/empty.lproj \
   $(OSX_APP)/Contents/Resources/yerbas.icns $(OSX_APP)/Contents/Info.plist \
-  $(OSX_APP)/Contents/MacOS/Yerbas-Qt $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings
+  $(OSX_APP)/Contents/MacOS/Yerbas-Qt $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings \
+  $(OSX_APP)/Contents/MacOS/yerbasd $(OSX_APP)/Contents/MacOS/yerbas-cli $(OSX_APP)/Contents/MacOS/install_cli.sh
 
 osx_volname:
 	echo $(OSX_VOLNAME) >$@
 
 if BUILD_DARWIN
 $(OSX_DMG): $(OSX_APP_BUILT) $(OSX_PACKAGING) $(OSX_BACKGROUND_IMAGE)
-	$(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) -add-qt-tr $(OSX_QT_TRANSLATIONS) -translations-dir=$(QT_TRANSLATION_DIR) -dmg -verbose 2 -volname $(OSX_VOLNAME)
+	$(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) -add-qt-tr $(OSX_QT_TRANSLATIONS) -translations-dir=$(QT_TRANSLATION_DIR) -dmg -fancy $(OSX_FANCY_PLIST) -verbose 2 -volname $(OSX_VOLNAME)
 
 $(OSX_BACKGROUND_IMAGE).png: contrib/macdeploy/$(OSX_BACKGROUND_SVG)
 	sed 's/PACKAGE_NAME/$(PACKAGE_NAME)/' < "$<" | $(RSVG_CONVERT) -f png -d 36 -p 36 -o $@
@@ -256,16 +264,28 @@ EXTRA_DIST += \
     test/util/data/txcreatemultisig1.json \
     test/util/data/txcreatemultisig2.hex \
     test/util/data/txcreatemultisig2.json \
+    test/util/data/txcreatemultisig3.hex \
+    test/util/data/txcreatemultisig3.json \
+    test/util/data/txcreatemultisig4.hex \
+    test/util/data/txcreatemultisig4.json \
+    test/util/data/txcreatemultisig5.json \
     test/util/data/txcreateoutpubkey1.hex \
     test/util/data/txcreateoutpubkey1.json \
+    test/util/data/txcreateoutpubkey2.hex \
+    test/util/data/txcreateoutpubkey2.json \
+    test/util/data/txcreateoutpubkey3.hex \
+    test/util/data/txcreateoutpubkey3.json \
     test/util/data/txcreatescript1.hex \
     test/util/data/txcreatescript1.json \
     test/util/data/txcreatescript2.hex \
     test/util/data/txcreatescript2.json \
+    test/util/data/txcreatescript3.hex \
+    test/util/data/txcreatescript3.json \
+    test/util/data/txcreatescript4.hex \
+    test/util/data/txcreatescript4.json \
     test/util/data/txcreatesignv1.hex \
     test/util/data/txcreatesignv1.json \
-    test/util/data/txcreatesignv2.hex \
-    test/util/rpcauth-test.py
+    test/util/data/txcreatesignv2.hex
 
 CLEANFILES = $(OSX_DMG) $(BITCOIN_WIN_INSTALLER)
 

@@ -325,12 +325,15 @@ BITCOIN_QT_WALLET_CPP = \
   qt/assetcontroltreewidget.cpp \
   qt/assetfilterproxy.cpp \
   qt/assetsdialog.cpp \
+  qt/createassetdialog.cpp \
   qt/coincontroldialog.cpp \
   qt/coincontroltreewidget.cpp \
   qt/editaddressdialog.cpp \
   qt/smartnodelist.cpp \
   qt/openuridialog.cpp \
   qt/overviewpage.cpp \
+  qt/myrestrictedassettablemodel.cpp \
+  qt/myrestrictedassetrecord.cpp \
   qt/paymentrequestplus.cpp \
   qt/paymentserver.cpp \
   qt/qrdialog.cpp \
