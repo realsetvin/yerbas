@@ -268,6 +268,14 @@ void UpdateLLMQParams(size_t totalMnCount, int height, bool lowLLMQParams = fals
 
 void TurnOffSegwit();
 
+void TurnOffBIP34();
+
+void TurnOffBIP65();
+
+void TurnOffBIP66();
+
+void TurnOffCSV();
+
 /**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.

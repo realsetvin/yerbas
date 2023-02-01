@@ -58,7 +58,10 @@ QT_FORMS_UI = \
   qt/forms/sendcoinsdialog.ui \
   qt/forms/sendcoinsentry.ui \
   qt/forms/signverifymessagedialog.ui \
-  qt/forms/transactiondescdialog.ui
+  qt/forms/transactiondescdialog.ui \
+  qt/forms/mnemonicdialog1.ui \
+  qt/forms/mnemonicdialog2.ui \
+  qt/forms/mnemonicdialog3.ui
 
 QT_MOC_CPP = \
   qt/moc_addressbookpage.cpp \
@@ -90,6 +93,7 @@ QT_MOC_CPP = \
   qt/moc_intro.cpp \
   qt/moc_macdockiconhandler.cpp \
   qt/moc_macnotificationhandler.cpp \
+  qt/moc_mnemonicdialog.cpp \
   qt/moc_modaloverlay.cpp \
   qt/moc_myrestrictedassettablemodel.cpp \
   qt/moc_smartnodelist.cpp \
@@ -173,6 +177,7 @@ BITCOIN_QT_H = \
   qt/macnotificationhandler.h \
   qt/macos_appnap.h \
   qt/modaloverlay.h \
+  qt/mnemonicdialog.h \
   qt/myrestrictedassettablemodel.h \
   qt/myrestrictedassetrecord.h \
   qt/smartnodelist.h \
@@ -217,8 +222,7 @@ BITCOIN_QT_H = \
   qt/walletview.h \
   qt/winshutdownmonitor.h
 
-
-RES_ICONS = \  
+RES_ICONS = \
   qt/res/icons/asset_administrator.png \
   qt/res/icons/asset_administrator_dark.png \
   qt/res/icons/asset_create.png \
@@ -350,7 +354,8 @@ BITCOIN_QT_WALLET_CPP = \
   qt/walletframe.cpp \
   qt/walletmodel.cpp \
   qt/walletmodeltransaction.cpp \
-  qt/walletview.cpp
+  qt/walletview.cpp \
+  qt/mnemonicdialog.cpp
 
 BITCOIN_QT_CPP = $(BITCOIN_QT_BASE_CPP)
 if TARGET_WINDOWS

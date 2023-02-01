@@ -10,25 +10,32 @@
 #include "chain.h"
 #include "consensus/validation.h"
 #include "core_io.h"
-#include "init.h"
 #include "httpserver.h"
+#include "validation.h"
 #include "keepass.h"
 #include "net.h"
 #include "policy/feerate.h"
 #include "policy/fees.h"
+#include "policy/policy.h"
+#include "policy/rbf.h"
 #include "privatesend/privatesend-client.h"
 #include "rpc/mining.h"
+#include "rpc/safemode.h"
 #include "rpc/server.h"
+#include "script/sign.h"
 #include "timedata.h"
 #include "util.h"
+#include "utiltime.h"
 #include "utilmoneystr.h"
-#include "validation.h"
 #include "wallet/coincontrol.h"
+#include "wallet/feebumper.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 
 #include "llmq/quorums_chainlocks.h"
 #include "llmq/quorums_instantsend.h"
+
+#include <init.h>  // For StartShutdown
 
 #include <stdint.h>
 
@@ -2370,6 +2377,7 @@ UniValue encryptwallet(const JSONRPCRequest& request)
     // slack space in .dat files; that is bad if the old data is
     // unencrypted private keys. So:
     StartShutdown();
+    
     return "Wallet encrypted; Yerbas Core server stopping, restart to run with encrypted wallet. The keypool has been flushed and a new HD seed was generated (if you are using HD). You need to make a new backup.";
 }
 
