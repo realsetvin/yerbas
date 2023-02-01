@@ -29,9 +29,15 @@ void RegisterGovernanceRPCCommands(CRPCTable &tableRPC);
 void RegisterEvoRPCCommands(CRPCTable &tableRPC);
 /** Register Quorums RPC commands */
 void RegisterQuorumsRPCCommands(CRPCTable &tableRPC);
+void RegisterAssetRPCCommands(CRPCTable &tableRPC);
+/** Register message RPC commands */
+void RegisterMessageRPCCommands(CRPCTable &tableRPC);
+/** Register rewards RPC commands */
+void RegisterRewardsRPCCommands(CRPCTable &tableRPC);
 
 static inline void RegisterAllCoreRPCCommands(CRPCTable &t)
 {
+    RegisterAssetRPCCommands(t);
     RegisterBlockchainRPCCommands(t);
     RegisterNetRPCCommands(t);
     RegisterMiscRPCCommands(t);
@@ -42,6 +48,8 @@ static inline void RegisterAllCoreRPCCommands(CRPCTable &t)
     RegisterGovernanceRPCCommands(t);
     RegisterEvoRPCCommands(t);
     RegisterQuorumsRPCCommands(t);
+    RegisterMessageRPCCommands(t);
+    RegisterRewardsRPCCommands(t);
 }
 
 #endif

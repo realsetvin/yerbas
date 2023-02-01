@@ -43,6 +43,12 @@
 #include <miniupnpc/upnperrors.h>
 #endif
 
+#include <math.h>
+
+#include <string>       // std::string
+#include <iostream>     // std::cout
+#include <sstream>
+
 
 #include <math.h>
 
@@ -53,12 +59,12 @@
 #define FEELER_SLEEP_WINDOW 1
 
 #if !defined(HAVE_MSG_NOSIGNAL)
-#define MSG_NOSIGNAL 0
+///#define MSG_NOSIGNAL 0
 #endif
 
 // MSG_DONTWAIT is not available on some platforms, if it doesn't exist define it as 0
 #if !defined(HAVE_MSG_DONTWAIT)
-#define MSG_DONTWAIT 0
+///#define MSG_DONTWAIT 0
 #endif
 
 // Fix for ancient MinGW versions, that don't have defined these in ws2tcpip.h.
@@ -3191,6 +3197,8 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     fPauseRecv = false;
     fPauseSend = false;
     nProcessQueueSize = 0;
+
+    fGetAssetData = false;
 
     for (const std::string &msg : getAllNetMessageTypes())
         mapRecvBytesPerMsgCmd[msg] = 0;

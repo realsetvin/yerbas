@@ -8,6 +8,7 @@
 #include "zmqpublishnotifier.h"
 #include "validation.h"
 #include "util.h"
+#include "rpc/server.h"
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier*> mapPublishNotifiers;
 
@@ -27,6 +28,7 @@ static const char *MSG_RAWTXLOCKSIG  = "rawtxlocksig";
 static const char *MSG_RAWGVOTE      = "rawgovernancevote";
 static const char *MSG_RAWGOBJ       = "rawgovernanceobject";
 static const char *MSG_RAWISCON      = "rawinstantsenddoublespend";
+static const char *MSG_RAWASSETMSG = "rawmessage";
 
 // Internal function to send multipart message
 static int zmq_send_multipart(void *sock, const void* data, size_t size, ...)
@@ -236,7 +238,7 @@ bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
     LogPrint(BCLog::ZMQ, "zmq: Publish rawblock %s\n", pindex->GetBlockHash().GetHex());
 
     const Consensus::Params& consensusParams = Params().GetConsensus();
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION | RPCSerializationFlags());
     {
         LOCK(cs_main);
         CBlock block;
@@ -257,7 +259,7 @@ bool CZMQPublishRawChainLockNotifier::NotifyChainLock(const CBlockIndex *pindex,
     LogPrint(BCLog::ZMQ, "zmq: Publish rawchainlock %s\n", pindex->GetBlockHash().GetHex());
 
     const Consensus::Params& consensusParams = Params().GetConsensus();
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION | RPCSerializationFlags());
     {
         LOCK(cs_main);
         CBlock block;
@@ -278,7 +280,7 @@ bool CZMQPublishRawChainLockSigNotifier::NotifyChainLock(const CBlockIndex *pind
     LogPrint(BCLog::ZMQ, "zmq: Publish rawchainlocksig %s\n", pindex->GetBlockHash().GetHex());
 
     const Consensus::Params& consensusParams = Params().GetConsensus();
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION | RPCSerializationFlags());
     {
         LOCK(cs_main);
         CBlock block;
@@ -349,4 +351,13 @@ bool CZMQPublishRawInstantSendDoubleSpendNotifier::NotifyInstantSendDoubleSpendA
     ssPrevious << previousTx;
     return SendMessage(MSG_RAWISCON, &(*ssCurrent.begin()), ssCurrent.size())
         && SendMessage(MSG_RAWISCON, &(*ssPrevious.begin()), ssPrevious.size());
+}
+
+bool CZMQPublishNewAssetMessageNotifier::NotifyMessage(const CMessage &message)
+{
+    LogPrint(BCLog::ZMQ, "zmq: Publish message %s\n", message.ToString());
+
+    CZMQMessage zmqmessage(message);
+    std::string str = zmqmessage.createJsonString();
+    return SendMessage(MSG_RAWASSETMSG, &(*str.begin()), str.size());
 }

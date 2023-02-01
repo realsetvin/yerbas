@@ -5,7 +5,10 @@
 """CompactBlocksTest -- test compact blocks (BIP 152,  without segwit support, version 1)
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import (NodeConnCB, mininode_lock, MsgGetHeaders, MsgHeaders, CBlockHeader, MsgBlock, CTransaction, CTxIn, CTxOut, COutPoint, MsgCmpctBlock, MsgSendCmpct, MsgSendHeaders,
+                                     P2PHeaderAndShortIDs, PrefilledTransaction, from_hex, CBlock, HeaderAndShortIDs, CInv, MsgGetdata, MsgInv, calculate_shortid, MsgWitnessBlocktxn, MsgBlockTxn,
+                                     BlockTransactions, MsgTx, MSG_WITNESS_FLAG, MsgWitnessBlock, MsgGetBlockTxn, BlockTransactionsRequest, to_hex, CTxInWitness, ser_uint256, NodeConn, NODE_NETWORK,
+                                     NetworkThread, NODE_WITNESS)
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.blocktools import create_block, create_coinbase
@@ -716,6 +719,15 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.test_node = self.nodes[0].add_p2p_connection(TestP2PConn())
         self.second_node = self.nodes[1].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK)
         self.old_node = self.nodes[1].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK)
+
+        connections = [NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.test_node),
+                       NodeConn('127.0.0.1', p2p_port(1), self.nodes[1],
+                                self.segwit_node, services=NODE_NETWORK | NODE_WITNESS),
+                       NodeConn('127.0.0.1', p2p_port(1), self.nodes[1],
+                                self.old_node, services=NODE_NETWORK)]
+        self.test_node.add_connection(connections[0])
+        self.segwit_node.add_connection(connections[1])
+        self.old_node.add_connection(connections[2])
 
         network_thread_start()
 

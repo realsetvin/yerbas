@@ -46,6 +46,9 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "assets/assets.h"
+#include "assets/assetdb.h"
+#include "assets/snapshotrequestdb.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -311,6 +314,64 @@ void PrepareShutdown()
         pcoinsdbview = nullptr;
         delete pblocktree;
         pblocktree = nullptr;
+
+       /** YERB START */
+        delete passets;
+        passets = nullptr;
+
+        delete passetsdb;
+        passetsdb = nullptr;
+
+        delete passetsCache;
+        passetsCache = nullptr;
+
+        delete pMessagesCache;
+        pMessagesCache = nullptr;
+
+        delete pMessageSubscribedChannelsCache;
+        pMessageSubscribedChannelsCache = nullptr;
+
+        delete pMessagesSeenAddressCache;
+        pMessagesSeenAddressCache = nullptr;
+
+        delete pmessagechanneldb;
+        pmessagechanneldb = nullptr;
+
+        delete pmessagedb;
+        pmessagedb = nullptr;
+
+        delete pmyrestricteddb;
+        pmyrestricteddb = nullptr;
+
+        delete passetsVerifierCache;
+        passetsVerifierCache = nullptr;
+
+        delete passetsQualifierCache;
+        passetsQualifierCache = nullptr;
+
+        delete passetsRestrictionCache;
+        passetsRestrictionCache = nullptr;
+
+        delete passetsGlobalRestrictionCache;
+        passetsGlobalRestrictionCache = nullptr;
+
+        delete prestricteddb;
+        prestricteddb = nullptr;
+
+        delete pmessagechanneldb;
+        pmessagechanneldb = nullptr;
+
+        delete pSnapshotRequestDb;
+        pSnapshotRequestDb = nullptr;
+
+        delete pAssetSnapshotDb;
+        pAssetSnapshotDb = nullptr;
+
+        delete pDistributeSnapshotDb;
+        pDistributeSnapshotDb = nullptr;
+
+        /** YERB END */
+
         llmq::DestroyLLMQSystem();
         delete deterministicMNManager;
         deterministicMNManager = nullptr;
@@ -461,7 +522,12 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize));
     }
     strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache));
+    strUsage += HelpMessageOpt("-disablemessaging", strprintf(_("Turn off the databasing the messages sent with assets (default: %u)"), false));
+    if (showDebug)
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file on startup"));
+    strUsage += HelpMessageOpt("-maxreorg=<n>", strprintf(_("Set the Maximum reorg depth (default: %u)"), defaultChainParams->MaxReorganizationDepth()));
+    strUsage += HelpMessageOpt("-minreorgpeers=<n>", strprintf(_("Set the Minimum amount of peers required to disallow reorg of chains of depth >= maxreorg. Peers must be greater than. (default: %u)"), defaultChainParams->MinReorganizationPeers()));
+    strUsage += HelpMessageOpt("-minreorgage=<n>", strprintf(_("Set the Minimum tip age (in seconds) required to allow reorg of a chain of depth >= maxreorg on a node with more than minreorgpeers peers. (default: %u)"), defaultChainParams->MinReorganizationAge()));
     strUsage += HelpMessageOpt("-maxorphantxsize=<n>", strprintf(_("Maximum total size of all orphan transactions in megabytes (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE));
     strUsage += HelpMessageOpt("-maxmempool=<n>", strprintf(_("Keep the transaction memory pool below <n> megabytes (default: %u)"), DEFAULT_MAX_MEMPOOL_SIZE));
     strUsage += HelpMessageOpt("-mempoolexpiry=<n>", strprintf(_("Do not keep transactions in the mempool longer than <n> hours (default: %u)"), DEFAULT_MEMPOOL_EXPIRY));
@@ -485,6 +551,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
 #endif
     strUsage += HelpMessageOpt("-txindex", strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"), DEFAULT_TXINDEX));
+    strUsage += HelpMessageOpt("-assetindex", _("Keep an index of assets, used by the requestsnapshot rpc call. Requires a -reindex."));
 
     strUsage += HelpMessageOpt("-addressindex", strprintf(_("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses (default: %u)"), DEFAULT_ADDRESSINDEX));
     strUsage += HelpMessageOpt("-timestampindex", strprintf(_("Maintain a timestamp index for block hashes, used to query blocks hashes by a range of timestamps (default: %u)"), DEFAULT_TIMESTAMPINDEX));
@@ -549,6 +616,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-zmqpubrawtx=<address>", _("Enable publish raw transaction in <address>"));
     strUsage += HelpMessageOpt("-zmqpubrawtxlock=<address>", _("Enable publish raw transaction (locked via InstantSend) in <address>"));
     strUsage += HelpMessageOpt("-zmqpubrawinstantsenddoublespend=<address>", _("Enable publish raw transactions of attempted InstantSend double spend in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubrawmessage=<address>", _("Enable publish raw asset messages in <address>"));
 #endif
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
@@ -631,12 +699,14 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-bytespersigop", strprintf(_("Minimum bytes per sigop in transactions we relay and mine (default: %u)"), DEFAULT_BYTES_PER_SIGOP));
     strUsage += HelpMessageOpt("-datacarrier", strprintf(_("Relay and mine data carrier transactions (default: %u)"), DEFAULT_ACCEPT_DATACARRIER));
     strUsage += HelpMessageOpt("-datacarriersize", strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"), MAX_OP_RETURN_RELAY));
+    strUsage += HelpMessageOpt("-mempoolreplacement", strprintf(_("Enable transaction replacement in the memory pool (default: %u)"), DEFAULT_ENABLE_REPLACEMENT));
     strUsage += HelpMessageOpt("-minrelaytxfee=<amt>", strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and transaction creation (default: %s)"),
         CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)));
     strUsage += HelpMessageOpt("-whitelistrelay", strprintf(_("Accept relayed transactions received from whitelisted peers even when not relaying transactions (default: %d)"), DEFAULT_WHITELISTRELAY));
     strUsage += HelpMessageOpt("-whitelistforcerelay", strprintf(_("Force relay of transactions from whitelisted peers even if they violate local relay policy (default: %d)"), DEFAULT_WHITELISTFORCERELAY));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
+    strUsage += HelpMessageOpt("-blockmaxweight=<n>", strprintf(_("Set maximum BIP141 block weight (default: %d)"), MAX_BLOCK_WEIGHT - 4000));
     strUsage += HelpMessageOpt("-blockmaxsize=<n>", strprintf(_("Set maximum block size in bytes (default: %d)"), DEFAULT_BLOCK_MAX_SIZE));
     strUsage += HelpMessageOpt("-blockmintxfee=<amt>", strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be included in block creation. (default: %s)"), CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)));
     if (showDebug)
@@ -992,6 +1062,15 @@ void InitParameterInteraction()
             LogPrintf("%s: parameter interaction: -whitelistforcerelay=1 -> setting -whitelistrelay=1\n", __func__);
     }
 
+    if (gArgs.IsArgSet("-blockmaxsize")) {
+        unsigned int max_size = gArgs.GetArg("-blockmaxsize", 0);
+        if (gArgs.SoftSetArg("blockmaxweight", strprintf("%d", max_size * WITNESS_SCALE_FACTOR))) {
+            LogPrintf("%s: parameter interaction: -blockmaxsize=%d -> setting -blockmaxweight=%d (-blockmaxsize is deprecated!)\n", __func__, max_size, max_size * WITNESS_SCALE_FACTOR);
+        } else {
+            LogPrintf("%s: Ignoring blockmaxsize setting which is overridden by blockmaxweight", __func__);
+        }
+    }
+
 #ifdef ENABLE_WALLET
     if (gArgs.IsArgSet("-hdseed") && IsHex(gArgs.GetArg("-hdseed", "not hex")) && (gArgs.IsArgSet("-mnemonic") || gArgs.IsArgSet("-mnemonicpassphrase"))) {
         gArgs.ForceRemoveArg("-mnemonic");
@@ -1334,6 +1413,15 @@ bool AppInitParameterInteraction()
         nLocalServices = ServiceFlags(nLocalServices | NODE_BLOOM);
 
     nMaxTipAge = gArgs.GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
+
+    fEnableReplacement = gArgs.GetBoolArg("-mempoolreplacement", DEFAULT_ENABLE_REPLACEMENT);
+    if ((!fEnableReplacement) && gArgs.IsArgSet("-mempoolreplacement")) {
+        // Minimal effort at forwards compatibility
+        std::string strReplacementModeList = gArgs.GetArg("-mempoolreplacement", "");  // default is impossible
+        std::vector<std::string> vstrReplacementModes;
+        boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(","));
+        fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
+    }
 
     if (gArgs.IsArgSet("-vbparams")) {
         // Allow overriding version bits parameters for testing
@@ -1797,6 +1885,88 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReset);
                 llmq::InitLLMQSystem(*evoDb, &scheduler, false, fReset || fReindexChainState);
 
+                /** YERB START */
+                {
+                    // Basic assets
+                    delete passets;
+                    delete passetsdb;
+                    delete passetsCache;
+
+                    // Messaging assets
+                    delete pmessagedb;
+                    delete pmessagechanneldb;
+                    delete pMessagesCache;
+                    delete pMessagesSeenAddressCache;
+                    delete pMessageSubscribedChannelsCache;
+
+                    // My restricted assets
+                    delete pmyrestricteddb;
+
+                    // Restricted assets
+                    delete prestricteddb;
+                    delete passetsVerifierCache;
+                    delete passetsQualifierCache;
+                    delete passetsRestrictionCache;
+                    delete passetsGlobalRestrictionCache;
+
+                    //  Rewards
+                    delete pSnapshotRequestDb;
+                    delete pAssetSnapshotDb;
+                    delete pDistributeSnapshotDb;
+
+                    // Basic assets
+                    passetsdb = new CAssetsDB(nBlockTreeDBCache, false, fReset);
+                    passets = new CAssetsCache();
+                    passetsCache = new CLRUCache<std::string, CDatabasedAssetData>(MAX_CACHE_ASSETS_SIZE);
+
+                    // Messaging assets
+                    pMessagesCache = new CLRUCache<std::string, CMessage>(1000);
+                    pMessageSubscribedChannelsCache = new CLRUCache<std::string, int>(1000);
+                    pMessagesSeenAddressCache = new CLRUCache<std::string, int>(1000);
+                    pmessagedb = new CMessageDB(nBlockTreeDBCache, false, false);
+                    pmessagechanneldb = new CMessageChannelDB(nBlockTreeDBCache, false, false);
+
+                    // My restricted assets
+                    pmyrestricteddb = new CMyRestrictedDB(nBlockTreeDBCache, false, false);
+
+                    // Restricted assets
+                    prestricteddb = new CRestrictedDB(nBlockTreeDBCache, false, fReset);
+                    passetsVerifierCache = new CLRUCache<std::string, CNullAssetTxVerifierString>(
+                            MAX_CACHE_ASSETS_SIZE);
+                    passetsQualifierCache = new CLRUCache<std::string, int8_t>(MAX_CACHE_ASSETS_SIZE);
+                    passetsRestrictionCache = new CLRUCache<std::string, int8_t>(MAX_CACHE_ASSETS_SIZE);
+                    passetsGlobalRestrictionCache = new CLRUCache<std::string, int8_t>(MAX_CACHE_ASSETS_SIZE);
+
+                    // Rewards
+                    pSnapshotRequestDb = new CSnapshotRequestDB(nBlockTreeDBCache, false, false);
+                    pAssetSnapshotDb = new CAssetSnapshotDB(nBlockTreeDBCache, false, false);
+                    pDistributeSnapshotDb = new CDistributeSnapshotRequestDB(nBlockTreeDBCache, false, false);
+
+                    // Read for fAssetIndex to make sure that we only load asset address balances if it if true
+                    pblocktree->ReadFlag("assetindex", fAssetIndex);
+                    // Need to load assets before we verify the database
+                    if (!passetsdb->LoadAssets()) {
+                        strLoadError = _("Failed to load Assets Database");
+                        break;
+                    }
+
+                    if (!passetsdb->ReadReissuedMempoolState())
+                        LogPrintf(
+                                "Database failed to load last Reissued Mempool State. Will have to start from empty state");
+
+                    LogPrintf("Successfully loaded assets from database.\nCache of assets size: %d\n",
+                              passetsCache->Size());
+
+                    // Check for changed -disablemessaging state
+                    if (gArgs.GetArg("-disablemessaging", false)) {
+                        LogPrintf("Messaging is disabled\n");
+                        fMessaging = false;
+                    } else {
+                        LogPrintf("Messaging is enabled\n");
+                    }
+                }
+                /** YERB END */
+
                 if (fReset) {
                     pblocktree->WriteReindexing(true);
                     //If we're reindexing in prune mode, wipe away unusable block files and all undo data files
@@ -2020,6 +2190,10 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     {
         LogPrintf("Shutdown requested. Exiting.\n");
         return false;
+    }
+
+    if(chainparams.GetConsensus().nSegwitEnabled) {
+    		nLocalServices = ServiceFlags(nLocalServices | NODE_WITNESS);
     }
 
     // ********************************************************* Step 10a: Prepare Smartnode related stuff

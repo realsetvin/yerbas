@@ -23,6 +23,10 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     if (!keystore->GetKey(address, key))
         return false;
 
+    // Signing with uncompressed keys is disabled in witness scripts
+    if (sigversion == SIGVERSION_WITNESS_V0 && !key.IsCompressed())
+        return false;
+
     uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion);
     if (!key.Sign(hash, vchSig))
         return false;
@@ -76,6 +80,45 @@ static bool SignStep(const BaseSignatureCreator& creator, const CScript& scriptP
     case TX_NONSTANDARD:
     case TX_NULL_DATA:
         return false;
+    case TX_RESTRICTED_ASSET_DATA:
+        return false;
+    /** YERB START */
+    case TX_NEW_ASSET:
+        keyID = CKeyID(uint160(vSolutions[0]));
+        if (!Sign1(keyID, creator, scriptPubKey, ret, sigversion))
+            return false;
+        else
+        {
+            CPubKey vch;
+            creator.KeyStore().GetPubKey(keyID, vch);
+            ret.push_back(ToByteVector(vch));
+        }
+        return true;
+    case TX_TRANSFER_ASSET:
+        keyID = CKeyID(uint160(vSolutions[0]));
+        if (!Sign1(keyID, creator, scriptPubKey, ret, sigversion))
+            return false;
+        else
+        {
+            CPubKey vch;
+            creator.KeyStore().GetPubKey(keyID, vch);
+            ret.push_back(ToByteVector(vch));
+        }
+        return true;
+
+    case TX_REISSUE_ASSET:
+        keyID = CKeyID(uint160(vSolutions[0]));
+        if (!Sign1(keyID, creator, scriptPubKey, ret, sigversion))
+            return false;
+        else
+        {
+            CPubKey vch;
+            creator.KeyStore().GetPubKey(keyID, vch);
+            ret.push_back(ToByteVector(vch));
+        }
+        return true;
+    /** YERB END */
+
     case TX_PUBKEY:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, creator, scriptPubKey, ret, sigversion);
@@ -130,6 +173,8 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
     solved = SignStep(creator, script, result, whichType, SIGVERSION_BASE);
     bool P2SH = false;
     CScript subscript;
+    sigdata.scriptWitness.stack.clear();
+
 
     if (solved && whichType == TX_SCRIPTHASH)
     {
@@ -141,13 +186,32 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
         P2SH = true;
     }
 
+    if (solved && whichType == TX_WITNESS_V0_KEYHASH)
+    {
+        CScript witnessscript;
+        witnessscript << OP_DUP << OP_HASH160 << ToByteVector(result[0]) << OP_EQUALVERIFY << OP_CHECKSIG;
+        txnouttype subType;
+        solved = solved && SignStep(creator, witnessscript, result, subType, SIGVERSION_WITNESS_V0);
+        sigdata.scriptWitness.stack = result;
+        result.clear();
+    }
+    else if (solved && whichType == TX_WITNESS_V0_SCRIPTHASH)
+    {
+        CScript witnessscript(result[0].begin(), result[0].end());
+        txnouttype subType;
+        solved = solved && SignStep(creator, witnessscript, result, subType, SIGVERSION_WITNESS_V0) && subType != TX_SCRIPTHASH && subType != TX_WITNESS_V0_SCRIPTHASH && subType != TX_WITNESS_V0_KEYHASH;
+        result.push_back(std::vector<unsigned char>(witnessscript.begin(), witnessscript.end()));
+        sigdata.scriptWitness.stack = result;
+        result.clear();
+    }
+
     if (P2SH) {
         result.push_back(std::vector<unsigned char>(subscript.begin(), subscript.end()));
     }
     sigdata.scriptSig = PushAll(result);
 
     // Test solution
-    return solved && VerifyScript(sigdata.scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker());
+    return solved && VerifyScript(sigdata.scriptSig, fromPubKey, &sigdata.scriptWitness, STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker());
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn)
@@ -155,6 +219,7 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
     SignatureData data;
     assert(tx.vin.size() > nIn);
     data.scriptSig = tx.vin[nIn].scriptSig;
+    data.scriptWitness = tx.vin[nIn].scriptWitness;
     return data;
 }
 
@@ -162,6 +227,7 @@ void UpdateTransaction(CMutableTransaction& tx, unsigned int nIn, const Signatur
 {
     assert(tx.vin.size() > nIn);
     tx.vin[nIn].scriptSig = data.scriptSig;
+    tx.vin[nIn].scriptWitness = data.scriptWitness;
 }
 
 bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount& amount, int nHashType)
@@ -242,21 +308,24 @@ static std::vector<valtype> CombineMultisig(const CScript& scriptPubKey, const B
     return result;
 }
 
+
 namespace
 {
 struct Stacks
 {
     std::vector<valtype> script;
+    std::vector<valtype> witness;
 
     Stacks() {}
-    explicit Stacks(const std::vector<valtype>& scriptSigStack_) : script(scriptSigStack_) {}
-    explicit Stacks(const SignatureData& data) {
+    explicit Stacks(const std::vector<valtype>& scriptSigStack_) : script(scriptSigStack_), witness() {}
+    explicit Stacks(const SignatureData& data) : witness(data.scriptWitness.stack) {
         EvalScript(script, data.scriptSig, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker(), SIGVERSION_BASE);
     }
 
     SignatureData Output() const {
         SignatureData result;
         result.scriptSig = PushAll(script);
+        result.scriptWitness.stack = witness;
         return result;
     }
 };
@@ -274,10 +343,20 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
         if (sigs1.script.size() >= sigs2.script.size())
             return sigs1;
         return sigs2;
+    case TX_RESTRICTED_ASSET_DATA:
+        // Don't know anything about this, assume bigger one is correct:
+        if (sigs1.script.size() >= sigs2.script.size())
+            return sigs1;
+        return sigs2;
     case TX_PUBKEY:
     case TX_PUBKEYHASH:
         // Signatures are bigger than placeholders or empty scripts:
         if (sigs1.script.empty() || sigs1.script[0].empty())
+            return sigs2;
+        return sigs1;
+    case TX_WITNESS_V0_KEYHASH:
+        // Signatures are bigger than placeholders or empty scripts:
+        if (sigs1.witness.empty() || sigs1.witness[0].empty())
             return sigs2;
         return sigs1;
     case TX_SCRIPTHASH:
@@ -288,18 +367,37 @@ static Stacks CombineSignatures(const CScript& scriptPubKey, const BaseSignature
         else
         {
             // Recur to combine:
-            valtype spk = sigs1.script.back();
-            CScript pubKey2(spk.begin(), spk.end());
-
+            CScript pubKey2(sigs1.witness.back().begin(), sigs1.witness.back().end());
             txnouttype txType2;
-            std::vector<std::vector<unsigned char> > vSolutions2;
+            std::vector<valtype> vSolutions2;
             Solver(pubKey2, txType2, vSolutions2);
-            sigs1.script.pop_back();
-            sigs2.script.pop_back();
+            sigs1.witness.pop_back();
+            sigs1.script = sigs1.witness;
+            sigs1.witness.clear();
+            sigs2.witness.pop_back();
+            sigs2.script = sigs2.witness;
+            sigs2.witness.clear();
             Stacks result = CombineSignatures(pubKey2, checker, txType2, vSolutions2, sigs1, sigs2, sigversion);
-            result.script.push_back(spk);
+            result.witness = result.script;
+            result.script.clear();
+            result.witness.push_back(valtype(pubKey2.begin(), pubKey2.end()));
             return result;
         }
+    case TX_TRANSFER_ASSET:
+        // Signatures are bigger than placeholders or empty scripts:
+        if (sigs1.script.empty() || sigs1.script[0].empty())
+            return sigs2;
+        return sigs1;
+    case TX_NEW_ASSET:
+        // Signatures are bigger than placeholders or empty scripts:
+        if (sigs1.script.empty() || sigs1.script[0].empty())
+            return sigs2;
+        return sigs1;
+    case TX_REISSUE_ASSET:
+        // Signatures are bigger than placeholders or empty scripts:
+        if (sigs1.script.empty() || sigs1.script[0].empty())
+            return sigs2;
+        return sigs1;
     case TX_MULTISIG:
         return Stacks(CombineMultisig(scriptPubKey, checker, vSolutions, sigs1.script, sigs2.script, sigversion));
     default:

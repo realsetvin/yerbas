@@ -43,16 +43,24 @@
 
 #include <iostream>
 
+#include <QDebug>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
+#include <QGraphicsDropShadowEffect>
+#include <QToolButton>
+#include <QPushButton>
+#include <QPainter>
+#include <QWidgetAction>
 #include <QAction>
 #include <QApplication>
 #include <QDateTime>
-#include <QDesktopWidget>
 #include <QDragEnterEvent>
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QProgressDialog>
+#include <QScreen>
 #include <QSettings>
 #include <QShortcut>
 #include <QStackedWidget>
@@ -61,12 +69,20 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <QComboBox>
+#include <QDesktopWidget>
 
 #if QT_VERSION < 0x050000
 #include <QTextDocument>
 #include <QUrl>
 #else
 #include <QUrlQuery>
+#include <validation.h>
+#include <tinyformat.h>
+#include <QFontDatabase>
+#include <univalue/include/univalue.h>
+#include <QDesktopServices>
+
 #endif
 
 const std::string BitcoinGUI::DEFAULT_UIPLATFORM =
@@ -82,6 +98,8 @@ const std::string BitcoinGUI::DEFAULT_UIPLATFORM =
 /** Display name for default wallet name. Uses tilde to avoid name
  * collisions in the future with additional wallets */
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
+
+static bool ThreadSafeMessageBox(BitcoinGUI *gui, const std::string& message, const std::string& caption, unsigned int style);
 
 BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *networkStyle, QWidget *parent) :
     QMainWindow(parent),
@@ -174,6 +192,18 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
         setCentralWidget(rpcConsole);
     }
 
+   /** YERB START */
+    labelCurrentMarket = new QLabel();
+    labelCurrentPrice = new QLabel();
+    headerWidget = new QWidget();
+    pricingTimer = new QTimer();
+    networkManager = new QNetworkAccessManager();
+    request = new QNetworkRequest();
+    labelVersionUpdate = new QLabel();
+    networkVersionManager = new QNetworkAccessManager();
+    versionRequest = new QNetworkRequest();
+    /** YERB END */
+
     // Accept D&D of URIs
     setAcceptDrops(true);
 
@@ -207,7 +237,6 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     labelWalletEncryptionIcon = new QLabel();
     labelWalletHDStatusIcon = new QLabel();
     labelConnectionsIcon = new GUIUtil::ClickableLabel();
-
     labelBlocksIcon = new GUIUtil::ClickableLabel();
     if(enableWallet)
     {
@@ -306,6 +335,9 @@ BitcoinGUI::~BitcoinGUI()
 
 void BitcoinGUI::createActions()
 {
+    QFont font = QFont();
+    font.setPixelSize(22);
+    font.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.43);
     QActionGroup *tabGroup = new QActionGroup(this);
 
     overviewAction = new QAction(tr("&Overview"), this);
@@ -343,6 +375,7 @@ void BitcoinGUI::createActions()
 #else
     receiveCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_3));
 #endif
+    font.setWeight(QFont::Weight::ExtraLight);
     tabGroup->addAction(receiveCoinsAction);
 
     receiveCoinsMenuAction = new QAction(QIcon(":/icons/receiving_addresses"), receiveCoinsAction->text(), this);
@@ -353,6 +386,58 @@ void BitcoinGUI::createActions()
     historyAction->setStatusTip(tr("Browse transaction history"));
     historyAction->setToolTip(historyAction->statusTip());
     historyAction->setCheckable(true);
+
+    /** YERB START */
+    createAssetAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/asset_create_selected", ":/icons/asset_create"), tr("&Create Assets"), this);
+    createAssetAction->setStatusTip(tr("Create new assets"));
+    createAssetAction->setToolTip(createAssetAction->statusTip());
+    createAssetAction->setCheckable(true);
+    createAssetAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
+    createAssetAction->setFont(font);
+    tabGroup->addAction(createAssetAction);
+
+    transferAssetAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/asset_transfer_selected", ":/icons/asset_transfer"), tr("&Transfer Assets"), this);
+    transferAssetAction->setStatusTip(tr("Transfer assets to YERB addresses"));
+    transferAssetAction->setToolTip(transferAssetAction->statusTip());
+    transferAssetAction->setCheckable(true);
+    transferAssetAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    transferAssetAction->setFont(font);
+    tabGroup->addAction(transferAssetAction);
+
+    manageAssetAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/asset_manage_selected", ":/icons/asset_manage"), tr("&Manage Assets"), this);
+    manageAssetAction->setStatusTip(tr("Manage assets you are the administrator of"));
+    manageAssetAction->setToolTip(manageAssetAction->statusTip());
+    manageAssetAction->setCheckable(true);
+    manageAssetAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_7));
+    manageAssetAction->setFont(font);
+    tabGroup->addAction(manageAssetAction);
+
+    messagingAction = new QAction(platformStyle->SingleColorIcon(":/icons/editcopy"), tr("&Messaging"), this);
+    messagingAction->setStatusTip(tr("Coming Soon"));
+    messagingAction->setToolTip(messagingAction->statusTip());
+    messagingAction->setCheckable(true);
+//    messagingAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_9));
+    messagingAction->setFont(font);
+    tabGroup->addAction(messagingAction);
+
+    votingAction = new QAction(platformStyle->SingleColorIcon(":/icons/edit"), tr("&Voting"), this);
+    votingAction->setStatusTip(tr("Coming Soon"));
+    votingAction->setToolTip(votingAction->statusTip());
+    votingAction->setCheckable(true);
+    // votingAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_V));
+    votingAction->setFont(font);
+    tabGroup->addAction(votingAction);
+
+    restrictedAssetAction = new QAction(platformStyle->SingleColorIconOnOff(":/icons/restricted_asset_selected", ":/icons/restricted_asset"), tr("&Restricted Assets"), this);
+    restrictedAssetAction->setStatusTip(tr("Manage restricted assets"));
+    restrictedAssetAction->setToolTip(restrictedAssetAction->statusTip());
+    restrictedAssetAction->setCheckable(true);
+    restrictedAssetAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_8));
+    restrictedAssetAction->setFont(font);
+    tabGroup->addAction(restrictedAssetAction);
+
+    /** YERB END */
+
 #ifdef Q_OS_MAC
     historyAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_4));
 #else
@@ -391,6 +476,14 @@ void BitcoinGUI::createActions()
     connect(receiveCoinsMenuAction, SIGNAL(triggered()), this, SLOT(gotoReceiveCoinsPage()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
+    connect(transferAssetAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(transferAssetAction, SIGNAL(triggered()), this, SLOT(gotoAssetsPage()));
+    connect(createAssetAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(createAssetAction, SIGNAL(triggered()), this, SLOT(gotoCreateAssetsPage()));
+    connect(manageAssetAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(manageAssetAction, SIGNAL(triggered()), this, SLOT(gotoManageAssetsPage()));
+    connect(restrictedAssetAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(restrictedAssetAction, SIGNAL(triggered()), this, SLOT(gotoRestrictedAssetsPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(QIcon(":/icons/quit"), tr("E&xit"), this);
@@ -570,46 +663,337 @@ void BitcoinGUI::createMenuBar()
 
 void BitcoinGUI::createToolBars()
 {
-#ifdef ENABLE_WALLET
     if(walletFrame)
     {
-        QToolBar *toolbar = new QToolBar(tr("Tabs toolbar"));
-        toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-        toolbar->addAction(overviewAction);
-        toolbar->addAction(sendCoinsAction);
-        toolbar->addAction(receiveCoinsAction);
-        toolbar->addAction(historyAction);
         QSettings settings;
-        if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool() && smartnodeAction)
-        {
-            toolbar->addAction(smartnodeAction);
+        bool IconsOnly = settings.value("fToolbarIconsOnly", false).toBool();
+
+        /** YERB START */
+        // Create the background and the vertical tool bar
+        QWidget* toolbarWidget = new QWidget();
+
+        QString widgetStyleSheet = ".QWidget {background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 %1, stop: 1 %2);}";
+
+///        toolbarWidget->setStyleSheet(widgetStyleSheet.arg(platformStyle->LightBlueColor().name(), platformStyle->DarkBlueColor().name()));
+
+        labelToolbar = new QLabel();
+        labelToolbar->setContentsMargins(0,0,0,50);
+        labelToolbar->setAlignment(Qt::AlignLeft);
+
+        if(IconsOnly) {
+            labelToolbar->setPixmap(QPixmap::fromImage(QImage(":/icons/yerbtext")));
         }
-        toolbar->setMovable(false); // remove unused icon in upper left corner
+        else {
+            labelToolbar->setPixmap(QPixmap::fromImage(QImage(":/icons/yerbastext")));
+        }
+        labelToolbar->setStyleSheet(".QLabel{background-color: transparent;}");
+
+        /** YERB END */
+
+        m_toolbar = new QToolBar();
+        m_toolbar->setStyle(style());
+        m_toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
+        m_toolbar->setMovable(false);
+
+        if(IconsOnly) {
+            m_toolbar->setMaximumWidth(65);
+            m_toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        }
+        else {
+            m_toolbar->setMinimumWidth(labelToolbar->width());
+            m_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        }
+        m_toolbar->addAction(overviewAction);
+        m_toolbar->addAction(sendCoinsAction);
+        m_toolbar->addAction(receiveCoinsAction);
+        m_toolbar->addAction(historyAction);
+        m_toolbar->addAction(createAssetAction);
+        m_toolbar->addAction(transferAssetAction);
+        m_toolbar->addAction(manageAssetAction);
+//        m_toolbar->addAction(messagingAction);
+//        m_toolbar->addAction(votingAction);
+        m_toolbar->addAction(restrictedAssetAction);
+
+        QString openSansFontString = "font: normal 22pt \"Open Sans\";";
+        QString normalString = "font: normal 22pt \"Arial\";";
+        QString stringToUse = "";
+
+#if !defined(Q_OS_MAC)
+        stringToUse = openSansFontString;
+#else
+        stringToUse = normalString;
+#endif
+
+        /** YERB START */
+        QString tbStyleSheet = ".QToolBar {background-color : transparent; border-color: transparent; }  "
+                               ".QToolButton {background-color: transparent; border-color: transparent; width: 249px; color: %1; border: none;} "
+                               ".QToolButton:checked {background: none; background-color: none; selection-background-color: none; color: %2; border: none; font: %4} "
+                               ".QToolButton:hover {background: none; background-color: none; border: none; color: %3;} "
+                               ".QToolButton:disabled {color: gray;}";
+
+        m_toolbar->setStyleSheet(tbStyleSheet.arg(platformStyle->ToolBarNotSelectedTextColor().name(),
+                                                platformStyle->ToolBarSelectedTextColor().name(),
+                                                platformStyle->DarkOrangeColor().name(), stringToUse));
+
+        m_toolbar->setOrientation(Qt::Vertical);
+        m_toolbar->setIconSize(QSize(40, 40));
+
+        QLayout* lay = m_toolbar->layout();
+        for(int i = 0; i < lay->count(); ++i)
+            lay->itemAt(i)->setAlignment(Qt::AlignLeft);
+
         overviewAction->setChecked(true);
 
-        // Add Yerbas logo on the right side
-        QWidget* spacer = new QWidget();
-        spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        toolbar->addWidget(spacer);
+        QVBoxLayout* yerbasLabelLayout = new QVBoxLayout(toolbarWidget);
+        yerbasLabelLayout->addWidget(labelToolbar);
+        yerbasLabelLayout->addWidget(m_toolbar);
+        yerbasLabelLayout->setDirection(QBoxLayout::TopToBottom);
+        yerbasLabelLayout->addStretch(1);
 
-        QLabel *logoLabel = new QLabel();
-        QPixmap logoPixmap(":/images/yerbas_logo_toolbar");
-        logoLabel->setPixmap(logoPixmap);
-        toolbar->addWidget(logoLabel);
+        QString mainWalletWidgetStyle = QString(".QWidget{background-color: %1}").arg(platformStyle->MainBackGroundColor().name());
+        QWidget* mainWalletWidget = new QWidget();
+        mainWalletWidget->setStyleSheet(mainWalletWidgetStyle);
 
-        /** Create additional container for toolbar and walletFrame and make it the central widget.
-            This is a workaround mostly for toolbar styling on Mac OS but should work fine for every other OSes too.
-        */
-        QVBoxLayout *layout = new QVBoxLayout;
-        layout->addWidget(toolbar);
-        layout->addWidget(walletFrame);
+        /** Create the shadow effects for the main wallet frame. Make it so it puts a shadow on the tool bar */
+#if !defined(Q_OS_MAC)
+        QGraphicsDropShadowEffect *walletFrameShadow = new QGraphicsDropShadowEffect;
+        walletFrameShadow->setBlurRadius(50);
+        walletFrameShadow->setColor(COLOR_WALLETFRAME_SHADOW);
+        walletFrameShadow->setXOffset(-8.0);
+        walletFrameShadow->setYOffset(0);
+        mainWalletWidget->setGraphicsEffect(walletFrameShadow);
+#endif
+
+        QString widgetBackgroundSytleSheet = QString(".QWidget{background-color: %1}").arg(platformStyle->TopWidgetBackGroundColor().name());
+
+        // Set the headers widget options
+        headerWidget->setContentsMargins(0,25,0,0);
+        headerWidget->setStyleSheet(widgetBackgroundSytleSheet);
+///        headerWidget->setGraphicsEffect(GUIUtil::getShadowEffect());
+        headerWidget->setFixedHeight(75);
+
+        QFont currentMarketFont;
+        currentMarketFont.setFamily("Open Sans");
+        currentMarketFont.setWeight(QFont::Weight::Normal);
+        currentMarketFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+        currentMarketFont.setPixelSize(18);
+
+        // Set the pricing information
+        QHBoxLayout* priceLayout = new QHBoxLayout(headerWidget);
+        priceLayout->setContentsMargins(0,0,0,25);
+        priceLayout->setDirection(QBoxLayout::LeftToRight);
+        priceLayout->setAlignment(Qt::AlignVCenter);
+        labelCurrentMarket->setContentsMargins(50,0,0,0);
+        labelCurrentMarket->setAlignment(Qt::AlignVCenter);
+        labelCurrentMarket->setStyleSheet(STRING_LABEL_COLOR);
+        labelCurrentMarket->setFont(currentMarketFont);
+        labelCurrentMarket->setText(tr("Yerbas Market Price"));
+
+        QString currentPriceStyleSheet = ".QLabel{color: %1;}";
+        labelCurrentPrice->setContentsMargins(25,0,0,0);
+        labelCurrentPrice->setAlignment(Qt::AlignVCenter);
+        labelCurrentPrice->setStyleSheet(currentPriceStyleSheet.arg(COLOR_LABELS.name()));
+        labelCurrentPrice->setFont(currentMarketFont);
+
+        comboYerbUnit = new QComboBox(headerWidget);
+        QStringList list;
+        for(int unitNum = 0; unitNum < CurrencyUnits::count(); unitNum++) {
+            list.append(QString(CurrencyUnits::CurrencyOptions[unitNum].Header));
+        }
+        comboYerbUnit->addItems(list);
+        comboYerbUnit->setFixedHeight(26);
+        comboYerbUnit->setContentsMargins(5,0,0,0);
+        comboYerbUnit->setStyleSheet(STRING_LABEL_COLOR);
+        comboYerbUnit->setFont(currentMarketFont);
+
+        labelVersionUpdate->setText("<a href=\"https://github.com/The_Yerbas_Endeavor/yerbas/\">New Wallet Version Available</a>");
+        labelVersionUpdate->setTextFormat(Qt::RichText);
+        labelVersionUpdate->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        labelVersionUpdate->setOpenExternalLinks(true);
+        labelVersionUpdate->setContentsMargins(0,0,15,0);
+        labelVersionUpdate->setAlignment(Qt::AlignVCenter);
+        labelVersionUpdate->setStyleSheet(STRING_LABEL_COLOR);
+        labelVersionUpdate->setFont(currentMarketFont);
+        labelVersionUpdate->hide();
+
+        priceLayout->setGeometry(headerWidget->rect());
+        priceLayout->addWidget(labelCurrentMarket, 0, Qt::AlignVCenter | Qt::AlignLeft);
+        priceLayout->addWidget(labelCurrentPrice, 0,  Qt::AlignVCenter | Qt::AlignLeft);
+        priceLayout->addWidget(comboYerbUnit, 0 , Qt::AlignBottom| Qt::AlignLeft);
+        priceLayout->addStretch();
+        priceLayout->addWidget(labelVersionUpdate, 0 , Qt::AlignVCenter | Qt::AlignRight);
+
+        // Create the layout for widget to the right of the tool bar
+        QVBoxLayout* mainFrameLayout = new QVBoxLayout(mainWalletWidget);
+        mainFrameLayout->addWidget(headerWidget);
+#ifdef ENABLE_WALLET
+        mainFrameLayout->addWidget(walletFrame);
+#endif
+        mainFrameLayout->setDirection(QBoxLayout::TopToBottom);
+        mainFrameLayout->setContentsMargins(QMargins());
+
+        QVBoxLayout* layout = new QVBoxLayout();
+        layout->addWidget(toolbarWidget);
+        layout->addWidget(mainWalletWidget);
         layout->setSpacing(0);
         layout->setContentsMargins(QMargins());
-        QWidget *containerWidget = new QWidget();
+        layout->setDirection(QBoxLayout::LeftToRight);
+        QWidget* containerWidget = new QWidget();
         containerWidget->setLayout(layout);
         setCentralWidget(containerWidget);
+
+        // Network request code for the header widget
+        QObject::connect(networkManager, &QNetworkAccessManager::finished,
+                         this, [=](QNetworkReply *reply) {
+                    if (reply->error()) {
+                        labelCurrentPrice->setText("");
+                        qDebug() << reply->errorString();
+                        return;
+                    }
+                    // Get the data from the network request
+                    QString answer = reply->readAll();
+
+                    // Create regex expression to find the value with 8 decimals
+                    QRegExp rx("\\d*.\\d\\d\\d\\d\\d\\d\\d\\d");
+                    rx.indexIn(answer);
+
+                    // List the found values
+                    QStringList list = rx.capturedTexts();
+
+                    QString currentPriceStyleSheet = ".QLabel{color: %1;}";
+                    // Evaluate the current and next numbers and assign a color (green for positive, red for negative)
+                    bool ok;
+                    if (!list.isEmpty()) {
+                        double next = list.first().toDouble(&ok) * this->currentPriceDisplay->Scalar;
+                        if (!ok) {
+                            labelCurrentPrice->setStyleSheet(currentPriceStyleSheet.arg(COLOR_LABELS.name()));
+                            labelCurrentPrice->setText("");
+                        } else {
+                            double current = labelCurrentPrice->text().toDouble(&ok);
+                            if (!ok) {
+                                current = 0.00000000;
+                            } else {
+                                if (next < current && !this->unitChanged)
+                                    labelCurrentPrice->setStyleSheet(currentPriceStyleSheet.arg("red"));
+                                else if (next > current && !this->unitChanged)
+                                    labelCurrentPrice->setStyleSheet(currentPriceStyleSheet.arg("green"));
+                                else
+                                    labelCurrentPrice->setStyleSheet(currentPriceStyleSheet.arg(COLOR_LABELS.name()));
+                            }
+                            this->unitChanged = false;
+                            labelCurrentPrice->setText(QString("%1").arg(QString().setNum(next, 'f', this->currentPriceDisplay->Decimals)));
+                            labelCurrentPrice->setToolTip(tr("Brought to you by binance.com"));
+                        }
+                    }
+                }
+        );
+
+        connect(quitAction, SIGNAL(triggered()), qApp, SLOT(quit()));
+
+
+        // Signal change of displayed price units, must get new conversion ratio
+        connect(comboYerbUnit, SIGNAL(activated(int)), this, SLOT(currencySelectionChanged(int)));
+        // Create the timer
+        connect(pricingTimer, SIGNAL(timeout()), this, SLOT(getPriceInfo()));
+        pricingTimer->start(10000);
+        getPriceInfo();
+        /** YERB END */
+
+        // Get the latest Yerbas release and let the user know if they are using the latest version
+        // Network request code for the header widget
+        QObject::connect(networkVersionManager, &QNetworkAccessManager::finished,
+                         this, [=](QNetworkReply *reply) {
+                    if (reply->error()) {
+                        qDebug() << reply->errorString();
+                        return;
+                    }
+
+                    // Get the data from the network request
+                    QString answer = reply->readAll();
+
+                    UniValue releases(UniValue::VARR);
+                    releases.read(answer.toStdString());
+
+                    if (!releases.isArray()) {
+                        return;
+                    }
+
+                    if (!releases.size()) {
+                        return;
+                    }
+
+                    // Latest release lives in the first index of the array return from github v3 api
+                    auto latestRelease = releases[0];
+
+                    auto keys = latestRelease.getKeys();
+                    for (auto key : keys) {
+                       if (key == "tag_name") {
+                           auto latestVersion = latestRelease["tag_name"].get_str();
+
+                           QRegExp rx("v(\\d+).(\\d+).(\\d+)");
+                           rx.indexIn(QString::fromStdString(latestVersion));
+
+                           // List the found values
+                           QStringList list = rx.capturedTexts();
+                           static const int CLIENT_VERSION_MAJOR_INDEX = 1;
+                           static const int CLIENT_VERSION_MINOR_INDEX = 2;
+                           static const int CLIENT_VERSION_REVISION_INDEX = 3;
+                           bool fNewSoftwareFound = false;
+                           bool fStopSearch = false;
+                           if (list.size() >= 4) {
+                               if (CLIENT_VERSION_MAJOR < list[CLIENT_VERSION_MAJOR_INDEX].toInt()) {
+                                   fNewSoftwareFound = true;
+                               } else {
+                                   if (CLIENT_VERSION_MAJOR > list[CLIENT_VERSION_MAJOR_INDEX].toInt()) {
+                                       fStopSearch = true;
+                                   }
+                               }
+
+                               if (!fStopSearch) {
+                                   if (CLIENT_VERSION_MINOR < list[CLIENT_VERSION_MINOR_INDEX].toInt()) {
+                                       fNewSoftwareFound = true;
+                                   } else {
+                                       if (CLIENT_VERSION_MINOR > list[CLIENT_VERSION_MINOR_INDEX].toInt()) {
+                                           fStopSearch = true;
+                                       }
+                                   }
+                               }
+
+                               if (!fStopSearch) {
+                                   if (CLIENT_VERSION_REVISION < list[CLIENT_VERSION_REVISION_INDEX].toInt()) {
+                                       fNewSoftwareFound = true;
+                                   }
+                               }
+                           }
+
+                           if (fNewSoftwareFound) {
+                               labelVersionUpdate->setToolTip(QString::fromStdString(strprintf("Currently running: %s\nLatest version: %s", FormatFullVersion(),
+                                                                                               latestVersion)));
+                               labelVersionUpdate->show();
+
+                               // Only display the message on startup to the user around 1/2 of the time
+                               if (GetRandInt(2) == 1) {
+                                   bool fRet = uiInterface.ThreadSafeQuestion(
+                                           strprintf("\nCurrently running: %s\nLatest version: %s", FormatFullVersion(),
+                                                     latestVersion) + "\n\nWould you like to visit the releases page?",
+                                           "",
+                                           "New Wallet Version Found",
+                                           CClientUIInterface::MSG_VERSION | CClientUIInterface::BTN_NO);
+                                   if (fRet) {
+                                       QString link = "https://github.com/The_Yerbas_Endeavor/yerbas/releases";
+                                       QDesktopServices::openUrl(QUrl(link));
+                                   }
+                               }
+                           } else {
+                               labelVersionUpdate->hide();
+                           }
+                       }
+                    }
+                }
+        );
+
+        getLatestVersion();
     }
-#endif // ENABLE_WALLET
 }
 
 void BitcoinGUI::setClientModel(ClientModel *_clientModel)
@@ -678,6 +1062,10 @@ void BitcoinGUI::setClientModel(ClientModel *_clientModel)
         
             // initialize the disable state of the tray icon with the current value in the model.
             setTrayIconVisible(optionsModel->getHideTrayIcon());
+
+            // Init the currency display from settings
+            this->onCurrencyChange(optionsModel->getDisplayCurrencyIndex());
+
         }
     } else {
         // Disable possibility to show main window via action
@@ -752,6 +1140,15 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     usedSendingAddressesAction->setEnabled(enabled);
     usedReceivingAddressesAction->setEnabled(enabled);
     openAction->setEnabled(enabled);
+    /** YERBAS START */
+    transferAssetAction->setEnabled(false);
+    createAssetAction->setEnabled(false);
+    manageAssetAction->setEnabled(false);
+    messagingAction->setEnabled(false);
+    votingAction->setEnabled(false);
+    restrictedAssetAction->setEnabled(false);
+    /** YERBAS END */
+
 }
 
 void BitcoinGUI::createTrayIcon(const NetworkStyle *networkStyle)
@@ -940,6 +1337,33 @@ void BitcoinGUI::gotoVerifyMessageTab(QString addr)
 {
     if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
 }
+
+/** YERB START */
+void BitcoinGUI::gotoAssetsPage()
+{
+    transferAssetAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoAssetsPage();
+};
+
+void BitcoinGUI::gotoCreateAssetsPage()
+{
+    createAssetAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoCreateAssetsPage();
+};
+
+void BitcoinGUI::gotoManageAssetsPage()
+{
+    manageAssetAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoManageAssetsPage();
+};
+
+void BitcoinGUI::gotoRestrictedAssetsPage()
+{
+    restrictedAssetAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoRestrictedAssetsPage();
+};
+/** YERB END */
+
 #endif // ENABLE_WALLET
 
 void BitcoinGUI::updateNetworkState()
@@ -1273,84 +1697,50 @@ void BitcoinGUI::showEvent(QShowEvent *event)
 }
 
 #ifdef ENABLE_WALLET
-void BitcoinGUI::incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label)
+void BitcoinGUI::incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& assetName)
 {
-    IncomingTransactionMessage itx = {
-            date, unit, amount, type, address, label
-    };
-    incomingTransactions.emplace_back(itx);
+    // On new transaction, make an info balloon
+    QString msg = tr("Date: %1\n").arg(date);
+    if (assetName == "YERB")
+        msg += tr("Amount: %1\n").arg(BitcoinUnits::formatWithUnit(unit, amount, true));
+    else
+        msg += tr("Amount: %1\n").arg(BitcoinUnits::formatWithCustomName(assetName, amount, MAX_ASSET_UNITS, true));
 
-    if (incomingTransactions.size() == 1) {
-        // first TX since we last showed pending messages, let's wait 100ms and then show each individual message
-        incomingTransactionsTimer->start(100);
-    } else if (incomingTransactions.size() == 10) {
-        // we seem to have received 10 TXs in 100ms and we can expect even more, so let's pause for 1 sec and
-        // show a "Multiple TXs sent/received!" message instead of individual messages
-        incomingTransactionsTimer->start(1000);
-    }
+    msg += tr("Type: %1\n").arg(type);
+
+    if (!label.isEmpty())
+        msg += tr("Label: %1\n").arg(label);
+    else if (!address.isEmpty())
+        msg += tr("Address: %1\n").arg(address);
+    message((amount)<0 ? tr("Sent transaction") : tr("Incoming transaction"),
+             msg, CClientUIInterface::MSG_INFORMATION);
 }
-void BitcoinGUI::showIncomingTransactions()
+
+void BitcoinGUI::checkAssets()
 {
-    auto txs = std::move(this->incomingTransactions);
-
-    if (txs.empty()) {
-        return;
-    }
-
-    if (txs.size() >= 100) {
-        // Show one balloon for all transactions instead of showing one for each individual one
-        // (which would kill some systems)
-
-        CAmount sentAmount = 0;
-        CAmount receivedAmount = 0;
-        int sentCount = 0;
-        int receivedCount = 0;
-        for (auto& itx : txs) {
-            if (itx.amount < 0) {
-                sentAmount += itx.amount;
-                sentCount++;
-            } else {
-                receivedAmount += itx.amount;
-                receivedCount++;
-            }
+    // Check that status of RIP2 and activate the assets icon if it is active
+    if(AreAssetsDeployed()) {
+        transferAssetAction->setDisabled(false);
+        transferAssetAction->setToolTip(tr("Transfer assets to YERB addresses"));
+        createAssetAction->setDisabled(false);
+        createAssetAction->setToolTip(tr("Create new assets"));
+        manageAssetAction->setDisabled(false);
+        }
+    else {
+        transferAssetAction->setDisabled(true);
+        transferAssetAction->setToolTip(tr("Assets not yet active"));
+        createAssetAction->setDisabled(true);
+        createAssetAction->setToolTip(tr("Assets not yet active"));
+        manageAssetAction->setDisabled(true);
         }
 
-        QString title;
-        if (sentCount > 0 && receivedCount > 0) {
-            title = tr("Received and sent multiple transactions");
-        } else if (sentCount > 0) {
-            title = tr("Sent multiple transactions");
-        } else if (receivedCount > 0) {
-            title = tr("Received multiple transactions");
-        } else {
-            return;
-        }
+    if (AreRestrictedAssetsDeployed()) {
+        restrictedAssetAction->setDisabled(false);
+        restrictedAssetAction->setToolTip(tr("Manage restricted assets"));
 
-        // Use display unit of last entry
-        int unit = txs.back().unit;
-
-        QString msg;
-        if (sentCount > 0) {
-            msg += tr("Sent Amount: %1\n").arg(BitcoinUnits::formatWithUnit(unit, sentAmount, true));
-        }
-        if (receivedCount > 0) {
-            msg += tr("Received Amount: %1\n").arg(BitcoinUnits::formatWithUnit(unit, receivedAmount, true));
-        }
-
-        message(title, msg, CClientUIInterface::MSG_INFORMATION);
     } else {
-        for (auto& itx : txs) {
-            // On new transaction, make an info balloon
-            QString msg = tr("Date: %1\n").arg(itx.date) +
-                          tr("Amount: %1\n").arg(BitcoinUnits::formatWithUnit(itx.unit, itx.amount, true)) +
-                          tr("Type: %1\n").arg(itx.type);
-            if (!itx.label.isEmpty())
-                msg += tr("Label: %1\n").arg(itx.label);
-            else if (!itx.address.isEmpty())
-                msg += tr("Address: %1\n").arg(itx.address);
-            message((itx.amount)<0 ? tr("Sent transaction") : tr("Incoming transaction"),
-                    msg, CClientUIInterface::MSG_INFORMATION);
-        }
+        restrictedAssetAction->setDisabled(true);
+        restrictedAssetAction->setToolTip(tr("Restricted Assets not yet active"));
     }
 }
 #endif // ENABLE_WALLET
@@ -1581,7 +1971,7 @@ UnitDisplayStatusBarControl::UnitDisplayStatusBarControl(const PlatformStyle *pl
     optionsModel(0),
     menu(0)
 {
-    createContextMenu();
+    createContextMenu(platformStyle);
     setToolTip(tr("Unit to show amounts in. Click to select another unit."));
     QList<BitcoinUnits::Unit> units = BitcoinUnits::availableUnits();
     int max_width = 0;
@@ -1601,7 +1991,7 @@ void UnitDisplayStatusBarControl::mousePressEvent(QMouseEvent *event)
 }
 
 /** Creates context menu, its actions, and wires up all the relevant signals for mouse events. */
-void UnitDisplayStatusBarControl::createContextMenu()
+void UnitDisplayStatusBarControl::createContextMenu(const PlatformStyle *platformStyle)
 {
     menu = new QMenu(this);
     for (BitcoinUnits::Unit u : BitcoinUnits::availableUnits())
@@ -1648,4 +2038,42 @@ void UnitDisplayStatusBarControl::onMenuSelection(QAction* action)
     {
         optionsModel->setDisplayUnit(action->data());
     }
+}
+
+/** Triggered only when the user changes the combobox on the main GUI */
+void BitcoinGUI::currencySelectionChanged(int unitIndex)
+{
+    if(clientModel && clientModel->getOptionsModel())
+    {
+        clientModel->getOptionsModel()->setDisplayCurrencyIndex(unitIndex);
+    }
+}
+
+/** Triggered when the options model's display currency is updated */
+void BitcoinGUI::onCurrencyChange(int newIndex)
+{
+    qDebug() << "BitcoinGUI::onPriceUnitChange: " + QString::number(newIndex);
+
+    if(newIndex < 0 || newIndex >= CurrencyUnits::count()){
+        return;
+    }
+
+    this->unitChanged = true;
+    this->currentPriceDisplay = &CurrencyUnits::CurrencyOptions[newIndex];
+    //Update the main GUI box in case this was changed from the settings screen
+    //This will fire the event again, but the options model prevents the infinite loop
+    this->comboYerbUnit->setCurrentIndex(newIndex);
+    this->getPriceInfo();
+}
+
+void BitcoinGUI::getPriceInfo()
+{
+    request->setUrl(QUrl(QString("https://api.binance.com/api/v1/ticker/price?symbol=%1").arg(this->currentPriceDisplay->Ticker)));
+    networkManager->get(*request);
+}
+
+void BitcoinGUI::getLatestVersion()
+{
+    versionRequest->setUrl(QUrl("https://api.github.com/repos/The_Yerbas_Endeavor/yerbas/releases"));
+    networkVersionManager->get(*versionRequest);
 }

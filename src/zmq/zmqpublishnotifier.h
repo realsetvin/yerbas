@@ -125,4 +125,9 @@ class CZMQPublishRawInstantSendDoubleSpendNotifier : public CZMQAbstractPublishN
 public:
     bool NotifyInstantSendDoubleSpendAttempt(const CTransaction &currentTx, const CTransaction &previousTx) override;
 };
+class CZMQPublishNewAssetMessageNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyMessage(const CMessage& message) override;
+};
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

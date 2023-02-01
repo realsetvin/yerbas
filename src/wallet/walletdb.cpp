@@ -277,9 +277,16 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssValue >> wtx;
             CValidationState state;
             //skip founder check here
-            if (!(CheckTransaction(wtx, state, 0, 0) && (wtx.GetHash() == hash) && state.IsValid()))
+            if (!(CheckTransaction(wtx, state, 0, 0) && (wtx.GetHash() == hash) && state.IsValid())) {
+                // If a client has a wallet.dat that contains asset transactions, but we are syncing the chain.
+                // we want to make sure that we don't fail to load this wallet transaction just because it is an asset transaction
+                // before asset are active
+                if (state.GetRejectReason() != "bad-txns-is-asset-and-asset-not-active" && state.GetRejectReason() != "bad-txns-transfer-asset-bad-deserialize") {
+                    strErr = state.GetRejectReason();
+                    return false;
                 return false;
-
+                }
+            }
             // Undo serialize changes in 31600
             if (31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
             {

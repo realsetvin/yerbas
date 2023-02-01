@@ -239,11 +239,6 @@ static bool CheckTransactionSignature(const CMutableTransaction& tx)
         CTransactionRef txFrom;
         uint256 hashBlock;
         BOOST_ASSERT(GetTransaction(txin.prevout.hash, txFrom, Params().GetConsensus(), hashBlock));
-
-        CAmount amount = txFrom->vout[txin.prevout.n].nValue;
-        if (!VerifyScript(txin.scriptSig, txFrom->vout[txin.prevout.n].scriptPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&tx, i, amount))) {
-            return false;
-        }
     }
     return true;
 }

@@ -145,6 +145,21 @@ QT_TRANSLATE_NOOP("yerbas-core", ""
 "Invalid amount for -maxtxfee=<amount>: '%s' (must be at least the minrelay "
 "fee of %s to prevent stuck transactions)"),
 QT_TRANSLATE_NOOP("yerbas-core", ""
+"Invalid parameter: amount must be divisible by the smaller unit assigned to "
+"the asset"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Invalid parameter: asset_name must only consist of valid characters and have "
+"a size between 3 and 30 characters. See help for more details."),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Invalid parameter: ipfs_hash must be 46 characters. Txid must be valid 64 "
+"character hash"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Invalid parameters: asset_name can't have a '!' at the end of it. See help "
+"for more details."),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Keep an index of assets, used by the requestsnapshot rpc call. Requires a -"
+"reindex."),
+QT_TRANSLATE_NOOP("yerbas-core", ""
 "Maintain a full address index, used to query for the balance, txids and "
 "unspent outputs for addresses (default: %u)"),
 QT_TRANSLATE_NOOP("yerbas-core", ""
@@ -265,6 +280,23 @@ QT_TRANSLATE_NOOP("yerbas-core", ""
 "Tries to keep outbound traffic under the given target (in MiB per 24h), 0 = "
 "no limit (default: %d)"),
 QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to get restricted assets verifier string. Database out of sync. "
+"Reindex required"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to reissue asset: amount must be divisible by the smaller unit "
+"assigned to the asset"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to reissue asset: unit must be larger than current unit selection"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to replay blocks. You will need to rebuild the database using -"
+"reindex-chainstate."),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to rewind the database to a pre-fork state. You will need to "
+"redownload the blockchain"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"Unable to transfer restricted asset, this restricted asset has been globally "
+"frozen"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
 "Unable to locate enough PrivateSend denominated funds for this transaction."),
 QT_TRANSLATE_NOOP("yerbas-core", ""
 "Unable to locate enough PrivateSend non-denominated funds for this "
@@ -342,6 +374,9 @@ QT_TRANSLATE_NOOP("yerbas-core", ""
 QT_TRANSLATE_NOOP("yerbas-core", ""
 "You need to rebuild the database using -reindex to go back to unpruned "
 "mode.  This will redownload the entire blockchain"),
+QT_TRANSLATE_NOOP("yerbas-core", ""
+"When transferring an 'Ownership Asset' the amount must always be 1. Please "
+"try again with the amount of 1"),
 QT_TRANSLATE_NOOP("yerbas-core", "%d of last 100 blocks have unexpected version"),
 QT_TRANSLATE_NOOP("yerbas-core", "%s corrupt, salvage failed"),
 QT_TRANSLATE_NOOP("yerbas-core", "%s is not a valid backup folder!"),
@@ -362,6 +397,11 @@ QT_TRANSLATE_NOOP("yerbas-core", "Allow RFC1918 addresses to be relayed and conn
 QT_TRANSLATE_NOOP("yerbas-core", "Already have that input."),
 QT_TRANSLATE_NOOP("yerbas-core", "Always query for peer addresses via DNS lookup (default: %u)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Append comment to the user agent string"),
+QT_TRANSLATE_NOOP("yerbas-core", "Asset Transfer amounts must be greater than 0"),
+QT_TRANSLATE_NOOP("yerbas-core", "Asset doesn't exist: "),
+QT_TRANSLATE_NOOP("yerbas-core", "Asset must be a qualifier, sub qualifier, or a restricted asset"),
+QT_TRANSLATE_NOOP("yerbas-core", "Asset name is not valid"),
+QT_TRANSLATE_NOOP("yerbas-core", "Asset with this name is already in the mempool"),
 QT_TRANSLATE_NOOP("yerbas-core", "Attempt to recover private keys from a corrupt wallet on startup"),
 QT_TRANSLATE_NOOP("yerbas-core", "Automatic backups disabled"),
 QT_TRANSLATE_NOOP("yerbas-core", "Automatically create Tor hidden service (default: %d)"),
@@ -392,6 +432,7 @@ QT_TRANSLATE_NOOP("yerbas-core", "Enable publish hash of governance objects (lik
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish hash of governance votes in <address>"),
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish hash transaction (locked via InstantSend) in <address>"),
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish hash transaction in <address>"),
+QT_TRANSLATE_NOOP("yerbas-core", "Enable publish raw asset messages in <address>"),
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish raw block in <address>"),
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish raw transaction (locked via InstantSend) in <address>"),
 QT_TRANSLATE_NOOP("yerbas-core", "Enable publish raw transaction in <address>"),
@@ -423,6 +464,9 @@ QT_TRANSLATE_NOOP("yerbas-core", "Failed to load governance cache from"),
 QT_TRANSLATE_NOOP("yerbas-core", "Failed to load smartnode cache from"),
 QT_TRANSLATE_NOOP("yerbas-core", "Failed to load sporks cache from"),
 QT_TRANSLATE_NOOP("yerbas-core", "Failed to start a new mixing queue"),
+QT_TRANSLATE_NOOP("yerbas-core", "Failed to find restricted asset change address from inputs"),
+QT_TRANSLATE_NOOP("yerbas-core", "Failed to get asset data from script"),
+QT_TRANSLATE_NOOP("yerbas-core", "Failed to load Assets Database"),
 QT_TRANSLATE_NOOP("yerbas-core", "Fee (in %s/kB) to add to transactions you send (default: %s)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Found enough users, signing ( waiting %s )"),
 QT_TRANSLATE_NOOP("yerbas-core", "Found enough users, signing ..."),
@@ -434,7 +478,9 @@ QT_TRANSLATE_NOOP("yerbas-core", "Incompatible mode."),
 QT_TRANSLATE_NOOP("yerbas-core", "Incompatible version."),
 QT_TRANSLATE_NOOP("yerbas-core", "Incorrect or no genesis block found. Wrong datadir for network?"),
 QT_TRANSLATE_NOOP("yerbas-core", "Information"),
+QT_TRANSLATE_NOOP("yerbas-core", "Init Message Channels - Scanning Asset Transactions"),
 QT_TRANSLATE_NOOP("yerbas-core", "Initialization sanity check failed. %s is shutting down."),
+QT_TRANSLATE_NOOP("yerbas-core", "Insufficient asset funds"),
 QT_TRANSLATE_NOOP("yerbas-core", "Input is not valid."),
 QT_TRANSLATE_NOOP("yerbas-core", "Inputs vs outputs size mismatch."),
 QT_TRANSLATE_NOOP("yerbas-core", "InstantSend options:"),
@@ -445,6 +491,9 @@ QT_TRANSLATE_NOOP("yerbas-core", "Invalid amount for -%s=<amount>: '%s'"),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid amount for -discardfee=<amount>: '%s'"),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid amount for -fallbackfee=<amount>: '%s'"),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid amount for -paytxfee=<amount>: '%s' (must be at least %s)"),
+QT_TRANSLATE_NOOP("yerbas-core", "Invalid parameter: asset amount can't be equal to or less than zero."),
+QT_TRANSLATE_NOOP("yerbas-core", "Invalid parameter: asset amount greater than max money: "),
+QT_TRANSLATE_NOOP("yerbas-core", "Invalid parameter: asset_name '"),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid smartnodeblsprivkey. Please see documentation."),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid minimum number of spork signers specified with -minsporkkeys"),
 QT_TRANSLATE_NOOP("yerbas-core", "Invalid netmask specified in -whitelist: '%s'"),
@@ -515,6 +564,7 @@ QT_TRANSLATE_NOOP("yerbas-core", "Relay non-P2SH multisig (default: %u)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Replaying blocks..."),
 QT_TRANSLATE_NOOP("yerbas-core", "Rescan the block chain for missing wallet transactions on startup"),
 QT_TRANSLATE_NOOP("yerbas-core", "Rescanning..."),
+QT_TRANSLATE_NOOP("yerbas-core", "Restricted asset transfer from address that has been frozen"),
 QT_TRANSLATE_NOOP("yerbas-core", "Run in the background as a daemon and accept commands"),
 QT_TRANSLATE_NOOP("yerbas-core", "Send trace/debug info to console instead of debug.log file"),
 QT_TRANSLATE_NOOP("yerbas-core", "Send trace/debug info to debug.log file (default: %u)"),
@@ -527,6 +577,7 @@ QT_TRANSLATE_NOOP("yerbas-core", "Set the number of threads to service RPC calls
 QT_TRANSLATE_NOOP("yerbas-core", "Show all debugging options (usage: --help -help-debug)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Shrink debug.log file on client startup (default: 1 when no -debug)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Signing transaction failed"),
+QT_TRANSLATE_NOOP("yerbas-core", "Signing asset transaction failed"),
 QT_TRANSLATE_NOOP("yerbas-core", "Specify configuration file (default: %s)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Specify connection timeout in milliseconds (minimum: 1, default: %d)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Specify data directory"),
@@ -563,9 +614,16 @@ QT_TRANSLATE_NOOP("yerbas-core", "Transaction must have at least one recipient")
 QT_TRANSLATE_NOOP("yerbas-core", "Transaction not valid."),
 QT_TRANSLATE_NOOP("yerbas-core", "Transaction too large for fee policy"),
 QT_TRANSLATE_NOOP("yerbas-core", "Transaction too large"),
+QT_TRANSLATE_NOOP("yerbas-core", "Turn off the databasing the messages sent with assets (default: %u)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Trying to connect..."),
 QT_TRANSLATE_NOOP("yerbas-core", "Unable to bind to %s on this computer (bind returned error %s)"),
 QT_TRANSLATE_NOOP("yerbas-core", "Unable to bind to %s on this computer. %s is probably already running."),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to get coin to verify restricted asset transfer from address"),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to reissue asset: amount must be 0 or larger"),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to reissue asset: asset_name '"),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to reissue asset: reissuable is set to false"),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to reissue asset: reissuable must be 0 or 1"),
+QT_TRANSLATE_NOOP("yerbas-core", "Unable to reissue asset: unit must be between 8 and -1"),
 QT_TRANSLATE_NOOP("yerbas-core", "Unable to sign spork message, wrong key?"),
 QT_TRANSLATE_NOOP("yerbas-core", "Unable to start HTTP server. See debug log for details."),
 QT_TRANSLATE_NOOP("yerbas-core", "Unknown network specified in -onlynet: '%s'"),
@@ -583,6 +641,9 @@ QT_TRANSLATE_NOOP("yerbas-core", "Use devnet chain with provided name"),
 QT_TRANSLATE_NOOP("yerbas-core", "Use the test chain"),
 QT_TRANSLATE_NOOP("yerbas-core", "User Agent comment (%s) contains unsafe characters."),
 QT_TRANSLATE_NOOP("yerbas-core", "Username for JSON-RPC connections"),
+QT_TRANSLATE_NOOP("yerbas-core", "Verifier String doesn't exist for asset: "),
+QT_TRANSLATE_NOOP("yerbas-core", "Verifier String for asset trasnfer, not found"),
+QT_TRANSLATE_NOOP("yerbas-core", "Verifier not found for asset: "),
 QT_TRANSLATE_NOOP("yerbas-core", "Verifying blocks..."),
 QT_TRANSLATE_NOOP("yerbas-core", "Verifying wallet(s)..."),
 QT_TRANSLATE_NOOP("yerbas-core", "Very low number of keys left: %d"),

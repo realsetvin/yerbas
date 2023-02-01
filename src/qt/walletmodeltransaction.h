@@ -10,6 +10,7 @@
 #include <QObject>
 
 class SendCoinsRecipient;
+class SendAssetsRecipient;
 
 class CReserveKey;
 class CWallet;

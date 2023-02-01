@@ -10,14 +10,16 @@
 #endif
 
 #include "amount.h"
+#include "currencyunits.h"
 
 #include <QLabel>
 #include <QMainWindow>
 #include <QMap>
 #include <QMenu>
 #include <QPoint>
-#include <QPushButton>
 #include <QSystemTrayIcon>
+#include <QComboBox>
+#include <QDateTime>
 
 #ifdef Q_OS_MAC
 #include <qt/macos_appnap.h>
@@ -37,9 +39,12 @@ class HelpMessageDialog;
 class ModalOverlay;
 
 QT_BEGIN_NAMESPACE
+class QMenu;
 class QAction;
 class QProgressBar;
 class QProgressDialog;
+class QNetworkAccessManager;
+class QNetworkRequest;
 QT_END_NAMESPACE
 
 /**
@@ -127,6 +132,29 @@ private:
     QAction *showHelpMessageAction;
     QAction *showPrivateSendHelpAction;
 
+    /** YERB START */
+    QAction *transferAssetAction = nullptr;
+    QAction *createAssetAction = nullptr;
+    QAction *manageAssetAction = nullptr;
+    QAction *messagingAction = nullptr;
+    QAction *votingAction = nullptr;
+    QAction *restrictedAssetAction = nullptr;
+    QWidget *headerWidget = nullptr;
+    QLabel *labelCurrentMarket = nullptr;
+    QLabel *labelCurrentPrice = nullptr;
+    QComboBox *comboYerbUnit = nullptr;
+    QTimer *pricingTimer = nullptr;
+    QNetworkAccessManager* networkManager = nullptr;
+    QNetworkRequest* request = nullptr;
+    QLabel *labelVersionUpdate = nullptr;
+    QNetworkAccessManager* networkVersionManager = nullptr;
+    QNetworkRequest* versionRequest = nullptr;
+
+    QLabel *labelToolbar = nullptr;
+    QToolBar *m_toolbar = nullptr;
+
+    /** YERB END */
+
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
     QMenu *dockIconMenu;
@@ -144,6 +172,9 @@ private:
     int spinnerFrame;
 
     const PlatformStyle *platformStyle;
+
+    const CurrencyUnitDetails* currentPriceDisplay = &CurrencyUnits::CurrencyOptions[0];
+    bool unitChanged = true; //Setting this true makes the first price update not appear as an uptick
 
     struct IncomingTransactionMessage {
         QString date;
@@ -207,6 +238,17 @@ public Q_SLOTS:
     */
     void message(const QString &title, const QString &message, unsigned int style, bool *ret = nullptr);
 
+    void currencySelectionChanged(int unitIndex);
+    void onCurrencyChange(int newIndex);
+
+    void getPriceInfo();
+
+    void getLatestVersion();
+
+    /** IconsOnly true/false and updates toolbar accordingly. */
+    void updateIconsOnlyToolbar(bool);
+
+
 #ifdef ENABLE_WALLET
     /** Set the hd-enabled status as shown in the UI.
      @param[in] status            current hd enabled status
@@ -223,7 +265,11 @@ public Q_SLOTS:
     bool handlePaymentRequest(const SendCoinsRecipient& recipient);
 
     /** Show incoming transaction notification for new transactions. */
-    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label);
+    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& assetName);
+    
+    /** Show the assets button if assets are active */
+    void checkAssets();
+    
     void showIncomingTransactions();
 #endif // ENABLE_WALLET
 
@@ -247,6 +293,15 @@ private Q_SLOTS:
 
     /** Show open dialog */
     void openClicked();
+
+    /** YERB START */
+    /** Switch to assets page */
+    void gotoAssetsPage();
+    void gotoCreateAssetsPage();
+    void gotoManageAssetsPage();
+    void gotoRestrictedAssetsPage();
+    /** YERB END */
+
 #endif // ENABLE_WALLET
     /** Show configuration dialog */
     void optionsClicked();
@@ -319,7 +374,7 @@ private:
     /** Shows context menu with Display Unit options by the mouse coordinates */
     void onDisplayUnitsClicked(const QPoint& point);
     /** Creates context menu, its actions, and wires up all the relevant signals for mouse events. */
-    void createContextMenu();
+    void createContextMenu(const PlatformStyle *platformStyle);
 
 private Q_SLOTS:
     /** When Display Units are changed on OptionsModel it will refresh the display text of the control on the status bar */

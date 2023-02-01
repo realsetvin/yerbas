@@ -159,6 +159,8 @@ enum BlockStatus: uint32_t {
     BLOCK_FAILED_CHILD       =   64, //!< descends from failed block
     BLOCK_FAILED_MASK        =   BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
 
+    BLOCK_OPT_WITNESS       =   128, //!< block data in blk*.data was received with a witness-enforcing client
+
     BLOCK_CONFLICT_CHAINLOCK =   128, //!< conflicts with chainlock system
 };
 
@@ -179,7 +181,7 @@ public:
     //! pointer to the index of some further predecessor of this block
     CBlockIndex* pskip;
 
-    //! height of the entry in the chain. The genesis block has height 0
+   //! height of the entry in the chain. The genesis block has height 0
     int nHeight;
 
     //! Which # file this block is stored in (blk?????.dat)

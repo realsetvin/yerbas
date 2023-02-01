@@ -12,7 +12,7 @@ Yerbas is a community driven, developmental, grassroots, digital currency that e
 
  We are further expanding capabilities by adding the following features:
 
-A)	The deployment of a unique asset layer.  ---pushing you luck here, but maybe here soon ;)
+A)	The deployment of a unique asset layer.  ---pushing you luck here, but maybe ;)
 
 B)	Collaboration with real world vendors offering rewards and incentives to utilize Yerbas for everyday goods and services. 
 

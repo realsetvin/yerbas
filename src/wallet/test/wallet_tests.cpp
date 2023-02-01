@@ -18,6 +18,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <univalue.h>
+#include "util.h"
 
 extern CWallet* pwalletMain;
 
@@ -637,6 +638,11 @@ public:
 
 BOOST_FIXTURE_TEST_CASE(ListCoins, ListCoinsTestingSetup)
 {
+
+    BOOST_TEST_MESSAGE("Running ListCoins Test");
+    
+    TurnOffSegwit();
+
     std::string coinbaseAddress = coinbaseKey.GetPubKey().GetID().ToString();
 
     // Confirm ListCoins initially returns 1 coin grouped under coinbaseKey

@@ -748,6 +748,32 @@ https://www.transifex.com/projects/p/yerbas/</string>
         </widget>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_5_Display_IPFS" stretch="0,0,0">
+         <item>
+          <widget class="QLabel" name="ipfsUrlLabel">
+           <property name="toolTip">
+            <string>Third party URL for IPFS-viewer. %s in the URL is replaced by IPFS hash.</string>
+           </property>
+           <property name="text">
+            <string>IPFS Viewer URL</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="ipfsUrl">
+           <property name="toolTip">
+            <string>Third party URL for IPFS-viewer. %s in the URL is replaced by IPFS hash.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="ipfsUrlReset">
+           <property name="text">
+            <string>Reset</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
         <layout class="QHBoxLayout" name="horizontalLayout_2_Display">
          <item>
           <widget class="QLabel" name="unitLabel">
@@ -874,6 +900,19 @@ https://www.transifex.com/projects/p/yerbas/</string>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_Buttons">
+    <item>
+        <widget class="QPushButton" name="openYerbasConfButton">
+         <property name="toolTip">
+          <string>Open the %1 configuration file from the working directory.</string>
+         </property>
+         <property name="text">
+          <string>Open Configuration File</string>
+         </property>
+         <property name="autoDefault">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
      <item>
       <widget class="QPushButton" name="resetButton">
        <property name="toolTip">

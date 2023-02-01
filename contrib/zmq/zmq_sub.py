@@ -118,6 +118,9 @@ class ZMQHandler():
         elif topic == b"rawinstantsenddoublespend":
             print('- RAW IS DOUBLE SPEND ('+sequence+') -')
             print(binascii.hexlify(body).decode("utf-8"))
+        elif topic == b"rawmessage":
+            print('- RAW ASSET MSG ('+sequence+') -')
+            print(body)
         # schedule ourselves to receive the next message
         asyncio.ensure_future(self.handle())
 

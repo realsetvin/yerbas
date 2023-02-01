@@ -1,22 +1,24 @@
 // Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Yerbas Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_BLOCK_ENCODINGS_H
-#define BITCOIN_BLOCK_ENCODINGS_H
+#ifndef YERBAS_BLOCK_ENCODINGS_H
+#define YERBAS_BLOCK_ENCODINGS_H
 
 #include "primitives/block.h"
 
 #include <memory>
 
 class CTxMemPool;
+class CDatabasedAssetData;
 
 // Dumb helper to handle CTransaction compression at serialize-time
 struct TransactionCompressor {
 private:
     CTransactionRef& tx;
 public:
-    TransactionCompressor(CTransactionRef& txIn) : tx(txIn) {}
+    explicit TransactionCompressor(CTransactionRef& txIn) : tx(txIn) {}
 
     ADD_SERIALIZE_METHODS;
 
@@ -75,7 +77,7 @@ public:
     std::vector<CTransactionRef> txn;
 
     BlockTransactions() {}
-    BlockTransactions(const BlockTransactionsRequest& req) :
+    explicit BlockTransactions(const BlockTransactionsRequest& req) :
         blockhash(req.blockhash), txn(req.indexes.size()) {}
 
     ADD_SERIALIZE_METHODS;
@@ -148,7 +150,7 @@ public:
     // Dummy for deserialization
     CBlockHeaderAndShortTxIDs() {}
 
-    CBlockHeaderAndShortTxIDs(const CBlock& block);
+    CBlockHeaderAndShortTxIDs(const CBlock& block, bool fUseWTXID);
 
     uint64_t GetShortID(const uint256& txhash) const;
 
@@ -198,12 +200,39 @@ protected:
     CTxMemPool* pool;
 public:
     CBlockHeader header;
-    PartiallyDownloadedBlock(CTxMemPool* poolIn) : pool(poolIn) {}
+    explicit PartiallyDownloadedBlock(CTxMemPool* poolIn) : pool(poolIn) {}
 
-    // extra_txn is a list of extra transactions to look at, in <hash, reference> form
+    // extra_txn is a list of extra transactions to look at, in <witness hash, reference> form
     ReadStatus InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<uint256, CTransactionRef>>& extra_txn);
     bool IsTxAvailable(size_t index) const;
     ReadStatus FillBlock(CBlock& block, const std::vector<CTransactionRef>& vtx_missing);
 };
 
+class SerializedAssetData {
+public:
+    std::string name;
+    int8_t units;
+    CAmount amount;
+    int8_t reissuable;
+    int8_t hasIPFS;
+    std::string ipfs;
+    int32_t nHeight;
+
+    SerializedAssetData(const CDatabasedAssetData &assetData);
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(name);
+        READWRITE(amount);
+        READWRITE(units);
+        READWRITE(reissuable);
+        READWRITE(hasIPFS);
+        READWRITE(ipfs);
+        READWRITE(nHeight);
+    }
+
+
+};
 #endif

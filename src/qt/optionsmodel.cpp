@@ -19,6 +19,9 @@
 #include "net.h"
 #include "netbase.h"
 #include "txdb.h" // for -dbcache defaults
+#include "intro.h"
+#include "platformstyle.h"
+#include "guiconstants.h" // for DEFAULT_IPFS_VIEWER and DEFAULT_THIRD_PARTY_BROWSERS
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -78,12 +81,36 @@ void OptionsModel::Init(bool resetSettings)
         settings.setValue("nDisplayUnit", BitcoinUnits::YERB);
     nDisplayUnit = settings.value("nDisplayUnit").toInt();
 
+    if (!settings.contains("nDisplayCurrencyIndex"))
+        settings.setValue("nDisplayCurrencyIndex", 0);
+    nDisplayCurrencyIndex = settings.value("nDisplayCurrencyIndex", 0).toInt();
+
     if (!settings.contains("strThirdPartyTxUrls"))
         settings.setValue("strThirdPartyTxUrls", "");
     strThirdPartyTxUrls = settings.value("strThirdPartyTxUrls", "").toString();
 
     if (!settings.contains("theme"))
         settings.setValue("theme", "");
+
+    if (!settings.contains("strIpfsUrl"))
+        settings.setValue("strIpfsUrl", DEFAULT_IPFS_VIEWER);
+    strIpfsUrl = settings.value("strIpfsUrl", "").toString();
+
+    if (!settings.contains("fCoinControlFeatures"))
+        settings.setValue("fCoinControlFeatures", false);
+    fCoinControlFeatures = settings.value("fCoinControlFeatures", false).toBool();
+
+    if (!settings.contains("fCustomFeeFeatures"))
+        settings.setValue("fCustomFeeFeatures", false);
+    fCustomFeeFeatures = settings.value("fCustomFeeFeatures", false).toBool();
+
+    if (!settings.contains("fDarkModeEnabled"))
+        settings.setValue("fDarkModeEnabled", false);
+    fDarkModeEnabled = settings.value("fDarkModeEnabled", false).toBool();
+
+
+    if (!settings.contains("strDataDir"))
+        settings.setValue("strDataDir", Intro::getDefaultDataDirectory());
 
 #ifdef ENABLE_WALLET
     if (!settings.contains("fCoinControlFeatures"))
@@ -321,6 +348,8 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
         case CoinControlFeatures:
             return fCoinControlFeatures;
 #endif // ENABLE_WALLET
+        case IpfsUrl:
+            return strIpfsUrl;
         case DatabaseCache:
             return settings.value("nDatabaseCache");
         case ThreadsScriptVerif:
@@ -513,6 +542,15 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             Q_EMIT coinControlFeaturesChanged(fCoinControlFeatures);
             break;
 #endif // ENABLE_WALLET
+
+        case IpfsUrl:
+            if (strIpfsUrl != value.toString()) {
+                strIpfsUrl = value.toString();
+                settings.setValue("strIpfsUrl", strIpfsUrl);
+                setRestartRequired(true);
+            }
+            break;
+
         case DatabaseCache:
             if (settings.value("nDatabaseCache") != value) {
                 settings.setValue("nDatabaseCache", value);
@@ -550,6 +588,17 @@ void OptionsModel::setDisplayUnit(const QVariant &value)
         nDisplayUnit = value.toInt();
         settings.setValue("nDisplayUnit", nDisplayUnit);
         Q_EMIT displayUnitChanged(nDisplayUnit);
+    }
+}
+
+void OptionsModel::setDisplayCurrencyIndex(const QVariant &value)
+{
+    if (!value.isNull() && value.toInt() != nDisplayCurrencyIndex)
+    {
+        QSettings settings;
+        nDisplayCurrencyIndex = value.toInt();
+        settings.setValue("nDisplayCurrencyIndex", nDisplayCurrencyIndex);
+        Q_EMIT displayCurrencyIndexChanged(nDisplayCurrencyIndex);
     }
 }
 

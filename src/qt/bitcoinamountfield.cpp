@@ -25,7 +25,8 @@ public:
     explicit AmountSpinBox(QWidget *parent):
         QAbstractSpinBox(parent),
         currentUnit(BitcoinUnits::YERB),
-        singleStep(100000) // satoshis
+        singleStep(100000), // satoshis
+        assetUnit(-1)
     {
         setAlignment(Qt::AlignRight);
 
@@ -48,7 +49,7 @@ public:
         CAmount val = parse(input, &valid);
         if(valid)
         {
-            input = BitcoinUnits::format(currentUnit, val, false, BitcoinUnits::separatorAlways);
+            input = BitcoinUnits::format(currentUnit, val, false, BitcoinUnits::separatorAlways, assetUnit);
             lineEdit()->setText(input);
         }
     }
@@ -60,7 +61,7 @@ public:
 
     void setValue(const CAmount& value)
     {
-        lineEdit()->setText(BitcoinUnits::format(currentUnit, value, false, BitcoinUnits::separatorAlways));
+        lineEdit()->setText(BitcoinUnits::format(currentUnit, value, false, BitcoinUnits::separatorAlways, assetUnit));
         Q_EMIT valueChanged();
     }
 
@@ -91,6 +92,22 @@ public:
         singleStep = step;
     }
 
+    void setAssetUnit(int unit)
+    {
+        if (unit > MAX_ASSET_UNITS)
+            unit = MAX_ASSET_UNITS;
+
+        assetUnit = unit;
+
+        bool valid = false;
+        CAmount val = value(&valid);
+
+        if(valid)
+            setValue(val);
+        else
+            clear();
+    }
+
     QSize minimumSizeHint() const
     {
         if(cachedMinimumSizeHint.isEmpty())
@@ -99,7 +116,11 @@ public:
 
             const QFontMetrics fm(fontMetrics());
             int h = lineEdit()->minimumSizeHint().height();
-            int w = fm.width(BitcoinUnits::format(BitcoinUnits::YERB, BitcoinUnits::maxMoney(), false, BitcoinUnits::separatorAlways));
+            #ifndef QTversionPreFiveEleven
+            int w = fm.width(BitcoinUnits::format(BitcoinUnits::YERB, BitcoinUnits::maxMoney(), false, BitcoinUnits::separatorAlways, assetUnit));
+			#else
+				int w = fm.width(BitcoinUnits::format(BitcoinUnits::YERB, BitcoinUnits::maxMoney(), false, BitcoinUnits::separatorAlways, assetUnit));
+			#endif
             w += 2; // cursor blinking space
 
             QStyleOptionSpinBox opt;
@@ -128,6 +149,7 @@ private:
     int currentUnit;
     CAmount singleStep;
     mutable QSize cachedMinimumSizeHint;
+    int assetUnit;
 
     /**
      * Parse a string into a number of base monetary units and
@@ -137,7 +159,15 @@ private:
     CAmount parse(const QString &text, bool *valid_out=0) const
     {
         CAmount val = 0;
-        bool valid = BitcoinUnits::parse(currentUnit, text, &val);
+
+        // Update parsing function to work with asset parsing units
+        bool valid = false;
+        if (assetUnit >= 0) {
+            valid = BitcoinUnits::assetParse(assetUnit, text, &val);
+        }
+        else
+            valid = BitcoinUnits::parse(currentUnit, text, &val);
+
         if(valid)
         {
             if(val < 0 || val > BitcoinUnits::maxMoney())

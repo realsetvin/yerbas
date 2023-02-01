@@ -98,6 +98,8 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         if (!LoadGenesisBlock(chainparams)) {
             throw std::runtime_error("LoadGenesisBlock failed.");
         }
+
+        passets = new CAssetsCache();
         {
             CValidationState state;
             if (!ActivateBestChain(state, chainparams)) {
@@ -124,6 +126,7 @@ TestingSetup::~TestingSetup()
         llmq::DestroyLLMQSystem();
         delete pcoinsdbview;
         delete pblocktree;
+        delete passets;
         fs::remove_all(pathTemp);
 }
 

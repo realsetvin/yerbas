@@ -32,6 +32,14 @@ QT_TS = \
   qt/locale/yerbas_zh_TW.ts
 
 QT_FORMS_UI = \
+  qt/forms/assetsdialog.ui \
+  qt/forms/assetcontroldialog.ui \
+  qt/forms/createassetdialog.ui \
+  qt/forms/reissueassetdialog.ui \
+  qt/forms/restrictedassetsdialog.ui \
+  qt/forms/restrictedassignqualifier.ui \
+  qt/forms/restrictedfreezeaddress.ui \
+  qt/forms/sendassetsentry.ui \
   qt/forms/addressbookpage.ui \
   qt/forms/askpassphrasedialog.ui \
   qt/forms/coincontroldialog.ui \
@@ -56,6 +64,17 @@ QT_MOC_CPP = \
   qt/moc_addressbookpage.cpp \
   qt/moc_addresstablemodel.cpp \
   qt/moc_askpassphrasedialog.cpp \
+  qt/moc_assetcontroldialog.cpp \
+  qt/moc_assetcontroltreewidget.cpp \
+  qt/moc_assettablemodel.cpp \
+  qt/moc_assetfilterproxy.cpp \
+  qt/moc_assetsdialog.cpp \
+  qt/moc_createassetdialog.cpp \
+  qt/moc_reissueassetdialog.cpp \
+  qt/moc_restrictedassetsdialog.cpp \
+  qt/moc_restrictedassignqualifier.cpp \
+  qt/moc_restrictedfreezeaddress.cpp \
+  qt/moc_sendassetsentry.cpp \
   qt/moc_bantablemodel.cpp \
   qt/moc_bitcoinaddressvalidator.cpp \
   qt/moc_bitcoinamountfield.cpp \
@@ -72,6 +91,7 @@ QT_MOC_CPP = \
   qt/moc_macdockiconhandler.cpp \
   qt/moc_macnotificationhandler.cpp \
   qt/moc_modaloverlay.cpp \
+  qt/moc_myrestrictedassettablemodel.cpp \
   qt/moc_smartnodelist.cpp \
   qt/moc_notificator.cpp \
   qt/moc_openuridialog.cpp \
@@ -128,6 +148,13 @@ BITCOIN_QT_H = \
   qt/addressbookpage.h \
   qt/addresstablemodel.h \
   qt/askpassphrasedialog.h \
+  qt/assetcontroldialog.h \
+  qt/assetcontroltreewidget.h \
+  qt/assetfilterproxy.h \
+  qt/assetrecord.h \
+  qt/assetsdialog.h \
+  qt/assettablemodel.h \
+  qt/createassetdialog.h \
   qt/bantablemodel.h \
   qt/bitcoinaddressvalidator.h \
   qt/bitcoinamountfield.h \
@@ -146,6 +173,8 @@ BITCOIN_QT_H = \
   qt/macnotificationhandler.h \
   qt/macos_appnap.h \
   qt/modaloverlay.h \
+  qt/myrestrictedassettablemodel.h \
+  qt/myrestrictedassetrecord.h \
   qt/smartnodelist.h \
   qt/networkstyle.h \
   qt/notificator.h \
@@ -163,7 +192,12 @@ BITCOIN_QT_H = \
   qt/receivecoinsdialog.h \
   qt/receiverequestdialog.h \
   qt/recentrequeststablemodel.h \
+  qt/reissueassetdialog.h \
+  qt/restrictedassetsdialog.h \
+  qt/restrictedassignqualifier.h \
+  qt/restrictedfreezeaddress.h \
   qt/rpcconsole.h \
+  qt/sendassetsentry.h \
   qt/sendcoinsdialog.h \
   qt/sendcoinsentry.h \
   qt/signverifymessagedialog.h \
@@ -184,7 +218,15 @@ BITCOIN_QT_H = \
   qt/winshutdownmonitor.h
 
 
-RES_ICONS = \
+RES_ICONS = \  
+  qt/res/icons/asset_administrator.png \
+  qt/res/icons/asset_administrator_dark.png \
+  qt/res/icons/asset_create.png \
+  qt/res/icons/asset_create_selected.png \
+  qt/res/icons/asset_manage.png \
+  qt/res/icons/asset_manage_selected.png \
+  qt/res/icons/asset_transfer.png \
+  qt/res/icons/asset_transfer_selected.png \
   qt/res/icons/bitcoin.ico \
   qt/res/icons/bitcoin_testnet.ico \
   qt/res/icons/bitcoin.png \
@@ -222,6 +264,8 @@ RES_ICONS = \
   qt/res/icons/quit.png \
   qt/res/icons/receive.png \
   qt/res/icons/remove.png \
+  qt/res/icons/restricted_asset.png \
+  qt/res/icons/restricted_asset_selected.png \
   qt/res/icons/send.png \
   qt/res/icons/synced.png \
   qt/res/icons/transaction0.png \
@@ -231,6 +275,8 @@ RES_ICONS = \
   qt/res/icons/tx_input.png \
   qt/res/icons/tx_output.png \
   qt/res/icons/tx_mined.png \
+  qt/res/icons/tx_asset_input.png \
+  qt/res/icons/tx_asset_output.png \
   qt/res/icons/about.png \
   qt/res/icons/about_qt.png \
   qt/res/icons/verify.png \
@@ -254,6 +300,7 @@ BITCOIN_QT_BASE_CPP = \
   qt/notificator.cpp \
   qt/optionsdialog.cpp \
   qt/optionsmodel.cpp \
+  qt/assettablemodel.cpp \
   qt/peertablemodel.cpp \
   qt/platformstyle.cpp \
   qt/qvalidatedlineedit.cpp \
@@ -270,6 +317,10 @@ BITCOIN_QT_WALLET_CPP = \
   qt/addressbookpage.cpp \
   qt/addresstablemodel.cpp \
   qt/askpassphrasedialog.cpp \
+  qt/assetcontroldialog.cpp \
+  qt/assetcontroltreewidget.cpp \
+  qt/assetfilterproxy.cpp \
+  qt/assetsdialog.cpp \
   qt/coincontroldialog.cpp \
   qt/coincontroltreewidget.cpp \
   qt/editaddressdialog.cpp \
@@ -282,6 +333,11 @@ BITCOIN_QT_WALLET_CPP = \
   qt/receivecoinsdialog.cpp \
   qt/receiverequestdialog.cpp \
   qt/recentrequeststablemodel.cpp \
+  qt/reissueassetdialog.cpp \
+  qt/restrictedassetsdialog.cpp \
+  qt/restrictedassignqualifier.cpp \
+  qt/restrictedfreezeaddress.cpp \
+  qt/sendassetsentry.cpp \
   qt/sendcoinsdialog.cpp \
   qt/sendcoinsentry.cpp \
   qt/signverifymessagedialog.cpp \

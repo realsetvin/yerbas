@@ -12,6 +12,7 @@
 #include "bitcoinunits.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
+#include "guiconstants.h" // for DEFAULT_IPFS_VIEWER and DEFAULT_THIRD_PARTY_BROWSERS
 
 #include "validation.h" // for DEFAULT_SCRIPTCHECK_THREADS and MAX_SCRIPTCHECK_THREADS
 #include "netbase.h"
@@ -102,6 +103,8 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     ui->bitcoinAtStartup->setToolTip(ui->bitcoinAtStartup->toolTip().arg(tr(PACKAGE_NAME)));
     ui->bitcoinAtStartup->setText(ui->bitcoinAtStartup->text().arg(tr(PACKAGE_NAME)));
 
+    ui->openYerbasConfButton->setToolTip(ui->openYerbasConfButton->toolTip().arg(tr(PACKAGE_NAME)));
+
     ui->lang->setToolTip(ui->lang->toolTip().arg(tr(PACKAGE_NAME)));
     ui->lang->addItem(QString("(") + tr("default") + QString(")"), QVariant(""));
     for (const QString &langStr : translations.entryList())
@@ -131,7 +134,8 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
         }
     }
 #if QT_VERSION >= 0x040700
-    ui->thirdPartyTxUrls->setPlaceholderText("https://example.com/tx/%s");
+//    ui->thirdPartyTxUrls->setPlaceholderText("https://example.com/tx/%s");
+//    ui->ipfsUrl->setPlaceholderText(DEFAULT_IPFS_VIEWER);
 #endif
 
     ui->unit->setModel(new BitcoinUnits(this));
@@ -193,7 +197,10 @@ void OptionsDialog::setModel(OptionsModel *_model)
     connect(ui->digits, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
     connect(ui->theme, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
+///    connect(ui->ipfsUrl, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
     connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
+    
+
 }
 
 void OptionsDialog::setMapper()
@@ -239,6 +246,8 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->lang, OptionsModel::Language);
     mapper->addMapping(ui->unit, OptionsModel::DisplayUnit);
     mapper->addMapping(ui->thirdPartyTxUrls, OptionsModel::ThirdPartyTxUrls);
+///    mapper->addMapping(ui->ipfsUrl, OptionsModel::IpfsUrl);
+///    mapper->addMapping(ui->toolbarIconsOnly, OptionsModel::ToolbarIconsOnly);
 
 }
 
@@ -265,6 +274,24 @@ void OptionsDialog::on_resetButton_clicked()
     }
 }
 
+void OptionsDialog::on_ipfsUrlReset_clicked()
+{
+    /* reset third-party IPFS viewer URL to default setting. */
+///    ui->ipfsUrl->setText(DEFAULT_IPFS_VIEWER);
+}
+
+void OptionsDialog::on_openYerbasConfButton_clicked()
+{
+    /* explain the purpose of the config file */
+    QMessageBox::information(this, tr("Configuration options"),
+        tr("The configuration file is used to specify advanced user options which override GUI settings. "
+           "Additionally, any command-line options will override this configuration file."));
+
+    /* show an error if there was some problem opening the file */
+    if (!GUIUtil::openYerbasConf())
+        QMessageBox::critical(this, tr("Error"), tr("The configuration file could not be opened."));
+}
+
 void OptionsDialog::on_okButton_clicked()
 {
     mapper->submit();
@@ -280,6 +307,12 @@ void OptionsDialog::on_okButton_clicked()
 void OptionsDialog::on_cancelButton_clicked()
 {
     reject();
+}
+
+void OptionsDialog::on_thirdPartyTxUrlsReset_clicked()
+{
+    // reset thirdPartyTxUrls to default
+    ui->thirdPartyTxUrls->setText(DEFAULT_THIRD_PARTY_BROWSERS);
 }
 
 void OptionsDialog::on_hideTrayIcon_stateChanged(int fState)

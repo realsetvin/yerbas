@@ -7,14 +7,20 @@
 
 #include "amount.h"
 
+#include <QSortFilterProxyModel>
 #include <QWidget>
+#include <QMenu>
 #include <memory>
+
 
 class ClientModel;
 class TransactionFilterProxy;
 class TxViewDelegate;
 class PlatformStyle;
 class WalletModel;
+class AssetFilterProxy;
+
+class AssetViewDelegate;
 
 namespace Ui {
     class OverviewPage;
@@ -22,6 +28,7 @@ namespace Ui {
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
+class QMenu;
 QT_END_NAMESPACE
 
 /** Overview ("home") page widget */
@@ -36,6 +43,10 @@ public:
     void setClientModel(ClientModel *clientModel);
     void setWalletModel(WalletModel *walletModel);
     void showOutOfSyncWarning(bool fShow);
+    void showAssets();
+
+    bool eventFilter(QObject *object, QEvent *event);
+    void openIPFSForAsset(const QModelIndex &index);
 
 public Q_SLOTS:
     void privateSendStatus();
@@ -44,10 +55,15 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void transactionClicked(const QModelIndex &index);
+    void assetSendClicked(const QModelIndex &index);
+    void assetIssueSubClicked(const QModelIndex &index);
+    void assetIssueUniqueClicked(const QModelIndex &index);
+    void assetReissueClicked(const QModelIndex &index);
     void outOfSyncWarningClicked();
 
 private:
     QTimer *timer;
+    QMenu *contextMenu;
     Ui::OverviewPage *ui;
     ClientModel *clientModel;
     WalletModel *walletModel;
@@ -64,6 +80,16 @@ private:
 
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
+    std::unique_ptr<AssetFilterProxy> assetFilter;
+
+    AssetViewDelegate *assetdelegate;
+///    QMenu *contextMenu;
+    QAction *sendAction;
+    QAction *issueSub;
+    QAction *issueUnique;
+    QAction *reissue;
+    QAction *openURL;
+    QAction *copyHashAction;
 
     void SetupTransactionList(int nNumItems);
     void DisablePrivateSendCompletely();
@@ -74,9 +100,11 @@ private Q_SLOTS:
     void updatePrivateSendProgress();
     void updateAdvancedPSUI(bool fShowAdvancedPSUI);
     void handleTransactionClicked(const QModelIndex &index);
+    void handleAssetRightClicked(const QModelIndex &index);
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);
     void handleOutOfSyncWarningClicks();
+    void assetSearchChanged();
 };
 
 #endif // BITCOIN_QT_OVERVIEWPAGE_H

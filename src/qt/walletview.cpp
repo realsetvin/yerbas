@@ -19,6 +19,12 @@
 #include "transactiontablemodel.h"
 #include "transactionview.h"
 #include "walletmodel.h"
+#include "assettablemodel.h"
+#include "assetsdialog.h"
+#include "createassetdialog.h"
+#include "reissueassetdialog.h"
+#include "restrictedassetsdialog.h"
+#include <validation.h>
 
 #include "ui_interface.h"
 
@@ -72,6 +78,11 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     receiveCoinsPage = new ReceiveCoinsDialog(platformStyle);
     sendCoinsPage = new SendCoinsDialog(platformStyle);
 
+    assetsPage = new AssetsDialog(platformStyle);
+    createAssetsPage = new CreateAssetDialog(platformStyle);
+    manageAssetsPage = new ReissueAssetDialog(platformStyle);
+    restrictedAssetsPage = new RestrictedAssetsDialog(platformStyle);
+
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
 
@@ -79,6 +90,14 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     addWidget(transactionsPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
+
+    /** YERB START */
+    addWidget(assetsPage);
+    addWidget(createAssetsPage);
+    addWidget(manageAssetsPage);
+    addWidget(restrictedAssetsPage);
+    /** YERB END */
+
 
     QSettings settings;
     if (!fLiteMode && settings.value("fShowSmartnodesTab").toBool()) {
@@ -104,6 +123,18 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 
     // Pass through messages from transactionView
     connect(transactionView, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+
+    /** YERB START */
+    connect(assetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(createAssetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(manageAssetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(restrictedAssetsPage, SIGNAL(message(QString,QString,unsigned int)), this, SIGNAL(message(QString,QString,unsigned int)));
+    connect(overviewPage, SIGNAL(assetSendClicked(QModelIndex)), assetsPage, SLOT(focusAsset(QModelIndex)));
+    connect(overviewPage, SIGNAL(assetIssueSubClicked(QModelIndex)), createAssetsPage, SLOT(focusSubAsset(QModelIndex)));
+    connect(overviewPage, SIGNAL(assetIssueUniqueClicked(QModelIndex)), createAssetsPage, SLOT(focusUniqueAsset(QModelIndex)));
+    connect(overviewPage, SIGNAL(assetReissueClicked(QModelIndex)), manageAssetsPage, SLOT(focusReissueAsset(QModelIndex)));
+    /** YERB END */
+
 }
 
 WalletView::~WalletView()
@@ -117,6 +148,18 @@ void WalletView::setBitcoinGUI(BitcoinGUI *gui)
         // Clicking on a transaction on the overview page simply sends you to transaction history page
         connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), gui, SLOT(gotoHistoryPage()));
 
+        // Clicking on a asset menu item Send
+        connect(overviewPage, SIGNAL(assetSendClicked(QModelIndex)), gui, SLOT(gotoAssetsPage()));
+
+        // Clicking on a asset menu item Issue Sub
+        connect(overviewPage, SIGNAL(assetIssueSubClicked(QModelIndex)), gui, SLOT(gotoCreateAssetsPage()));
+
+        // Clicking on a asset menu item Issue Unique
+        connect(overviewPage, SIGNAL(assetIssueUniqueClicked(QModelIndex)), gui, SLOT(gotoCreateAssetsPage()));
+
+        // Clicking on a asset menu item Reissue
+        connect(overviewPage, SIGNAL(assetReissueClicked(QModelIndex)), gui, SLOT(gotoManageAssetsPage()));
+
         // Receive and report messages
         connect(this, SIGNAL(message(QString,QString,unsigned int)), gui, SLOT(message(QString,QString,unsigned int)));
 
@@ -128,6 +171,9 @@ void WalletView::setBitcoinGUI(BitcoinGUI *gui)
 
         // Connect HD enabled state signal
         connect(this, SIGNAL(hdEnabledStatusChanged(int)), gui, SLOT(setHDStatus(int)));
+
+        // Pass through checkAssets calls to the GUI
+        connect(this, SIGNAL(checkAssets()), gui, SLOT(checkAssets()));
     }
 }
 
@@ -158,6 +204,14 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     sendCoinsPage->setModel(_walletModel);
     usedReceivingAddressesPage->setModel(_walletModel->getAddressTableModel());
     usedSendingAddressesPage->setModel(_walletModel->getAddressTableModel());
+
+    /** YERB START */
+    assetsPage->setModel(_walletModel);
+    createAssetsPage->setModel(_walletModel);
+    manageAssetsPage->setModel(_walletModel);
+    restrictedAssetsPage->setModel(_walletModel);
+    /** YERB End */
+
 
     if (_walletModel)
     {
@@ -192,7 +246,9 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
     TransactionTableModel *ttm = walletModel->getTransactionTableModel();
     if (!ttm || ttm->processingQueuedTransactions())
         return;
-
+    /** YERB START */
+    QString assetName = "";
+    /** YERB END */
     QModelIndex index = ttm->index(start, 0, parent);
     QSettings settings;
     if (!settings.value("fShowPrivateSendPopups").toBool()) {
@@ -208,8 +264,19 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
     QString type = ttm->index(start, TransactionTableModel::Type, parent).data().toString();
     QString address = ttm->data(index, TransactionTableModel::AddressRole).toString();
     QString label = ttm->data(index, TransactionTableModel::LabelRole).toString();
+/** YERB START */
+    assetName = ttm->data(index, TransactionTableModel::AssetNameRole).toString();
+/** YERB END */
+    Q_EMIT incomingTransaction(date, walletModel->getOptionsModel()->getDisplayUnit(), amount, type, address, label, assetName);
+/** YERB START */
+    overviewPage->showAssets();
+    transactionView->showAssets();
+    Q_EMIT checkAssets();
 
-    Q_EMIT incomingTransaction(date, walletModel->getOptionsModel()->getDisplayUnit(), amount, type, address, label);
+    assetsPage->processNewTransaction();
+    createAssetsPage->updateAssetList();
+    manageAssetsPage->updateAssetsList();
+/** YERB END */
 }
 
 void WalletView::gotoOverviewPage()
@@ -220,6 +287,7 @@ void WalletView::gotoOverviewPage()
 void WalletView::gotoHistoryPage()
 {
     setCurrentWidget(transactionsPage);
+    Q_EMIT checkAssets();
 }
 
 void WalletView::gotoSmartnodePage()
@@ -395,3 +463,30 @@ void WalletView::trxAmount(QString amount)
 {
     transactionSum->setText(amount);
 }
+bool fFirstVisit = true;
+/** YERB START */
+void WalletView::gotoAssetsPage()
+{
+    if (fFirstVisit){
+        fFirstVisit = false;
+        assetsPage->handleFirstSelection();
+    }
+    setCurrentWidget(assetsPage);
+    assetsPage->focusAssetListBox();
+}
+
+void WalletView::gotoCreateAssetsPage()
+{
+    setCurrentWidget(createAssetsPage);
+}
+
+void WalletView::gotoManageAssetsPage()
+{
+    setCurrentWidget(manageAssetsPage);
+}
+
+void WalletView::gotoRestrictedAssetsPage()
+{
+    setCurrentWidget(restrictedAssetsPage);
+}
+/** YERB END */

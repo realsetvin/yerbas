@@ -6,11 +6,15 @@
 
 #include "transactionrecord.h"
 
+#include "transactionview.h"
+#include "assets/assets.h"
 #include "base58.h"
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "timedata.h"
 #include "wallet/wallet.h"
+#include "core_io.h"
+#include "bitcoinunits.h"
 
 #include "privatesend/privatesend.h"
 
@@ -39,6 +43,11 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
 
+    /** YERB START */
+    if(isSwapTransaction(wallet, wtx, parts, nCredit, nDebit, nNet))
+        return parts;
+    /** YERB END */
+
     if (nNet > 0 || wtx.IsCoinBase())
     {
         //
@@ -48,6 +57,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         {
             const CTxOut& txout = wtx.tx->vout[i];
             isminetype mine = wallet->IsMine(txout);
+
+            /** YERB START */
+            if (txout.scriptPubKey.IsAssetScript() || txout.scriptPubKey.IsNullAssetTxDataScript() || txout.scriptPubKey.IsNullGlobalRestrictionAssetTxDataScript())
+                continue;
+            /** YERB END */
+
             if(mine)
             {
                 TransactionRecord sub(hash, nTime);
@@ -99,11 +114,13 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         isminetype fAllToMe = ISMINE_SPENDABLE;
         bool fAllToMeDenom = true;
         int nToMe = 0;
-        for (const CTxOut& txout : wtx.tx->vout) {
-            if(wallet->IsMine(txout)) {
-                fAllToMeDenom = fAllToMeDenom && CPrivateSend::IsDenominatedAmount(txout.nValue);
-                nToMe++;
-            }
+        for (const CTxOut& txout : wtx.tx->vout)
+        {
+            /** YERB START */
+            if (txout.scriptPubKey.IsAssetScript() || txout.scriptPubKey.IsNullAssetTxDataScript() || txout.scriptPubKey.IsNullGlobalRestrictionAssetTxDataScript())
+                continue;
+            /** YERB END */
+
             isminetype mine = wallet->IsMine(txout);
             if(mine & ISMINE_WATCH_ONLY) involvesWatchAddress = true;
             if(fAllToMe > mine) fAllToMe = mine;
@@ -183,6 +200,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 && nCredit == 0 // OP_RETURN
                 && CPrivateSend::IsCollateralAmount(-nNet))
             {
+
                 TransactionRecord sub(hash, nTime);
                 sub.idx = 0;
                 sub.type = TransactionRecord::PrivateSendCollateralPayment;
@@ -194,6 +212,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             for (unsigned int nOut = 0; nOut < wtx.tx->vout.size() && !fDone; nOut++)
             {
                 const CTxOut& txout = wtx.tx->vout[nOut];
+
+                /** YERB START */
+                if (txout.scriptPubKey.IsAssetScript())
+                    continue;
+                /** YERB END */
+
                 TransactionRecord sub(hash, nTime);
                 sub.idx = nOut;
                 sub.involvesWatchAddress = involvesWatchAddress;
@@ -244,12 +268,268 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             //
             // Mixed debit transaction, can't break down payees
             //
-            parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, "", nNet, 0));
-            parts.last().involvesWatchAddress = involvesWatchAddress;
+           /** YERB START */
+            // We will only show mixed debit transactions that are nNet < 0 or if they are nNet == 0 and
+            // they do not contain assets. This is so the list of transaction doesn't add 0 amount transactions to the
+            // list.
+            bool fIsMixedDebit = true;
+            if (nNet == 0) {
+                for (unsigned int nOut = 0; nOut < wtx.tx->vout.size(); nOut++) {
+                    const CTxOut &txout = wtx.tx->vout[nOut];
+
+                    if (txout.scriptPubKey.IsAssetScript() || txout.scriptPubKey.IsNullAssetTxDataScript() || txout.scriptPubKey.IsNullGlobalRestrictionAssetTxDataScript()) {
+                        fIsMixedDebit = false;
+                        break;
+                    }
+                }
+            }
+
+            if (fIsMixedDebit) {
+                parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, "", nNet, 0));
+                parts.last().involvesWatchAddress = involvesWatchAddress;
+            }
+            /** YERB END */
         }
     }
 
+
+    /** YERB START */
+    if (AreAssetsDeployed()) {
+        CAmount nFee;
+        std::string strSentAccount;
+        std::list<COutputEntry> listReceived;
+        std::list<COutputEntry> listSent;
+
+        std::list<CAssetOutputEntry> listAssetsReceived;
+        std::list<CAssetOutputEntry> listAssetsSent;
+
+        wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, ISMINE_ALL, listAssetsReceived, listAssetsSent);
+
+        //LogPrintf("TXID: %s: Rec: %d Sent: %d\n", wtx.GetHash().ToString(), listAssetsReceived.size(), listAssetsSent.size());
+
+        if (listAssetsReceived.size() > 0)
+        {
+            for (const CAssetOutputEntry &data : listAssetsReceived)
+            {
+                TransactionRecord sub(hash, nTime);
+                sub.idx = data.vout;
+
+                const CTxOut& txout = wtx.tx->vout[sub.idx];
+                isminetype mine = wallet->IsMine(txout);
+
+                sub.address = EncodeDestination(data.destination);
+                sub.assetName = data.assetName;
+                sub.credit = data.nAmount;
+                sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+
+                if (data.type == TX_NEW_ASSET)
+                    sub.type = TransactionRecord::Issue;
+                else if (data.type == TX_REISSUE_ASSET)
+                    sub.type = TransactionRecord::Reissue;
+                else if (data.type == TX_TRANSFER_ASSET)
+                    sub.type = TransactionRecord::TransferFrom;
+                else {
+                    sub.type = TransactionRecord::Other;
+                }
+
+                sub.units = DEFAULT_UNITS;
+
+                if (IsAssetNameAnOwner(sub.assetName))
+                    sub.units = OWNER_UNITS;
+                else if (CheckIssueDataTx(wtx.tx->vout[sub.idx]))
+                {
+                    CNewAsset asset;
+                    std::string strAddress;
+                    if (AssetFromTransaction(wtx, asset, strAddress))
+                        sub.units = asset.units;
+                }
+                else
+                {
+                    CNewAsset asset;
+                    if (passets->GetAssetMetaDataIfExists(sub.assetName, asset))
+                        sub.units = asset.units;
+                }
+
+                parts.append(sub);
+            }
+        }
+
+        if (listAssetsSent.size() > 0)
+        {
+            for (const CAssetOutputEntry &data : listAssetsSent)
+            {
+                TransactionRecord sub(hash, nTime);
+                sub.idx = data.vout;
+                sub.address = EncodeDestination(data.destination);
+                sub.assetName = data.assetName;
+                sub.credit = -data.nAmount;
+                sub.involvesWatchAddress = false;
+
+                if (data.type == TX_TRANSFER_ASSET)
+                    sub.type = TransactionRecord::TransferTo;
+                else
+                    sub.type = TransactionRecord::Other;
+
+                if (IsAssetNameAnOwner(sub.assetName))
+                    sub.units = OWNER_UNITS;
+                else if (CheckIssueDataTx(wtx.tx->vout[sub.idx]))
+                {
+                    CNewAsset asset;
+                    std::string strAddress;
+                    if (AssetFromTransaction(wtx, asset, strAddress))
+                        sub.units = asset.units;
+                }
+                else
+                {
+                    CNewAsset asset;
+                    if (passets->GetAssetMetaDataIfExists(sub.assetName, asset))
+                        sub.units = asset.units;
+                }
+
+                parts.append(sub);
+            }
+        }
+    }
+    /** YERB END */
+
     return parts;
+}
+
+bool TransactionRecord::isSwapTransaction(const CWallet *wallet, const CWalletTx &wtx, QList<TransactionRecord> &txRecords, const CAmount& nCredit, const CAmount& nDebit, const CAmount& nNet)
+{
+    if(!AreAssetsDeployed()) return false;
+
+    bool isSwap = false;
+    std::map<std::string, std::string> mapValue = wtx.mapValue;
+    for(size_t i=0; i < wtx.tx->vin.size(); i++)
+    {
+        auto tx_vin = wtx.tx->vin[i];
+
+        std::string vin_script = ScriptToAsmStr(tx_vin.scriptSig, true);
+        auto fIsSingleSign = vin_script.find("[SINGLE|ANYONECANPAY]") != std::string::npos;
+        isminetype mine = wallet->IsMine(tx_vin);
+
+        if(fIsSingleSign)
+        {
+            //There will always be a corresponding vout with the same index when SINGLE|ANYONECANPAY is used
+            auto swap_vout = wtx.tx->vout[i]; //The vout here represents what was recieved in the trade
+
+            TransactionRecord sub(wtx.GetHash(), wtx.GetTxTime());
+            sub.idx = i;
+            
+            sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+            CTxDestination destination;
+            ExtractDestination(swap_vout.scriptPubKey, destination);
+            sub.address = EncodeDestination(destination);
+
+            bool fSentAssets = false;
+            bool fRecvAssets = false;
+
+            CTxOut myProvidedInput;
+            CTxOut myReceievedOutput;
+
+            if(mine)
+            {
+                //If this is our SINGLE|ANYONECANPAY section, that means this was executed by another party
+                //Lookup previous transaction (*OF OURS*) in wallet history for full vout info
+                auto it = wallet->mapWallet.find(tx_vin.prevout.hash);
+                bool missing = (it == wallet->mapWallet.end());
+                CWalletTx my_input_vout_tx;
+                CTxOut my_input_vout;
+                if (missing) {
+                    LogPrintf("\tUnable to cross-refrerence historical transaction\n");
+                } else {
+                    my_input_vout_tx = it->second;
+                    my_input_vout = my_input_vout_tx.tx->vout[tx_vin.prevout.n];
+                }
+
+                //We were sent assets in the output
+                if(swap_vout.scriptPubKey.IsAssetScript())
+                    fRecvAssets = true;
+
+                //The vout we provided was for assets
+                if(!missing && my_input_vout.scriptPubKey.IsAssetScript())
+                    fSentAssets = true;
+
+                myReceievedOutput = swap_vout;
+                myProvidedInput = my_input_vout;
+                sub.type = TransactionRecord::Swap;
+            }
+            else //We were the ones executing the transaction
+            {
+                //In this case, the counterparty received assets, so we sent them.
+                if(swap_vout.scriptPubKey.IsAssetScript())
+                    fSentAssets = true;
+
+                //We can't directly check the counterparties vin here, so we have to look at the vouts to determine if we were sent assets or not
+                for(const CTxOut &txout : wtx.tx->vout)
+                {
+                    if(wallet->IsMine(txout))
+                    {
+                        //If we sent assets, we need to see if we were sent assets or YERB in return
+                        if(txout.scriptPubKey.IsAssetScript())
+                        {
+                            if(fSentAssets) { //Check to skip asset change by name
+                                std::string sentType;CAmount sentAmount;
+                                GetAssetInfoFromScript(swap_vout.scriptPubKey, sentType, sentAmount);
+                                std::string recvType;CAmount recvAmount;
+                                GetAssetInfoFromScript(txout.scriptPubKey, recvType, recvAmount);
+                                if(sentType == recvType)
+                                    continue;
+                            }
+                            fRecvAssets = true;
+                            myReceievedOutput = txout;
+                            break;
+                        }
+                        else //We got YERB
+                        {
+                            if(fSentAssets) { //If we sent assets, this is ours. but we need to adjust for change.
+                                myReceievedOutput = txout;
+                            } else {
+                                //If we didn't send assets (buying), this is likely just change
+                            }
+                        }
+                    }
+                }
+
+                myProvidedInput = swap_vout;
+                sub.type = TransactionRecord::SwapExecute;
+            }
+
+            std::string sentType;CAmount sentAmount;
+            std::string recvType;CAmount recvAmount;
+            if(fSentAssets) GetAssetInfoFromScript(myProvidedInput.scriptPubKey, sentType, sentAmount);
+            if(fRecvAssets) GetAssetInfoFromScript(myReceievedOutput.scriptPubKey, recvType, recvAmount);
+            
+            if(fSentAssets && fRecvAssets) {
+                //Trade!
+                //Amount represents the asset we sent, no matter the perspective
+                sub.credit = recvAmount;
+                std::string asset_qty_format = BitcoinUnits::formatWithCustomName(QString::fromStdString(sentType), sentAmount, 2).toUtf8().constData();
+                sub.assetName = strprintf("%s (%s %s)", TransactionView::tr("Traded Away").toUtf8().constData(), recvType, asset_qty_format);
+            } else if (fSentAssets) {
+                //Sell!
+                //Total price paid, need to use net calculation when we executed
+                sub.credit = mine ? myReceievedOutput.nValue : nNet;
+                std::string asset_qty_format = BitcoinUnits::formatWithCustomName(QString::fromStdString(sentType), sentAmount, 2).toUtf8().constData();
+                sub.assetName = strprintf("YERB (%s %s)", TransactionView::tr("Sold").toUtf8().constData(), asset_qty_format);
+            } else if (fRecvAssets) {
+                //Buy!
+                //Total price paid, need to use net calculation when we executed
+                sub.credit = (mine ? -myProvidedInput.nValue : nNet);
+                std::string asset_qty_format = BitcoinUnits::formatWithCustomName(QString::fromStdString(recvType), recvAmount, 2).toUtf8().constData();
+                sub.assetName = strprintf("YERB (%s %s)", TransactionView::tr("Bought").toUtf8().constData(), asset_qty_format);
+            } else {
+                LogPrintf("\tFell Through!\n");
+                return false; //!
+            }
+
+            txRecords.append(sub);
+            isSwap = true;
+        }
+    }
+
+    return isSwap;
 }
 
 void TransactionRecord::updateStatus(const CWalletTx &wtx, int chainLockHeight)

@@ -3618,7 +3618,7 @@ https://www.transifex.com/projects/p/yerbas/</translation>
     </message>
     <message>
         <source>Copy raw transaction</source>
-        <translation>Skopírovať neupravenú transakciu</translation>
+        <translation>Skopírovať neupyerbasú transakciu</translation>
     </message>
     <message>
         <source>Copy full transaction details</source>

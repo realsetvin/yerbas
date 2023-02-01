@@ -47,14 +47,15 @@ private Q_SLOTS:
     /* set OK button state (enabled / disabled) */
     void setOkButtonState(bool fState);
     void on_resetButton_clicked();
+    void on_ipfsUrlReset_clicked();
+    void on_thirdPartyTxUrlsReset_clicked();
     void on_okButton_clicked();
     void on_cancelButton_clicked();
-    
     void on_hideTrayIcon_stateChanged(int fState);
-
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
     void updateProxyValidationState();
+    void on_openYerbasConfButton_clicked();
     /* query the networks, for which the default proxy is used */
     void updateDefaultProxyNets();
 

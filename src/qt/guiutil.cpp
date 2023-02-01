@@ -54,6 +54,7 @@
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
 #include <QMouseEvent>
+#include <QPainter>
 
 #if QT_VERSION < 0x050000
 #include <QUrl>
@@ -77,12 +78,88 @@ extern double NSAppKitVersionNumber;
 #endif
 #endif
 
+#include <QGraphicsDropShadowEffect>
+#include "guiconstants.h"
+#include "platformstyle.h"
+
 namespace GUIUtil {
 
 // The theme to set by default if settings are missing or incorrect
 static const QString defaultTheme = "Dark";
 // The prefix a theme name should have if we want to apply dark colors and styles to it
 static const QString darkThemePrefix = "Dark";
+
+QFont getSubLabelFont()
+{
+    QFont labelSubFont;
+#if !defined(Q_OS_MAC)
+    labelSubFont.setFamily("Open Sans");
+#endif
+    labelSubFont.setWeight(QFont::Weight::ExtraLight);
+    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+    labelSubFont.setPixelSize(14);
+    return labelSubFont;
+}
+
+QFont getSubLabelFontBolded()
+{
+    QFont labelSubFont;
+#if !defined(Q_OS_MAC)
+    labelSubFont.setFamily("Open Sans");
+#endif
+    labelSubFont.setWeight(QFont::Weight::Bold);
+    labelSubFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+    labelSubFont.setPixelSize(14);
+    return labelSubFont;
+}
+
+QFont getTopLabelFontBolded()
+{
+    QFont labelTopFont;
+#if !defined(Q_OS_MAC)
+    labelTopFont.setFamily("Open Sans");
+#endif
+    labelTopFont.setWeight(QFont::Weight::Bold);
+    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+    labelTopFont.setPixelSize(18);
+    return labelTopFont;
+}
+
+QFont getTopLabelFont(int weight, int pxsize)
+{
+    QFont labelTopFont;
+#if !defined(Q_OS_MAC)
+    labelTopFont.setFamily("Open Sans");
+#endif
+    labelTopFont.setWeight(weight);
+    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+    labelTopFont.setPixelSize(pxsize);
+    return labelTopFont;
+}
+
+QFont getTopLabelFont()
+{
+    QFont labelTopFont;
+#if !defined(Q_OS_MAC)
+    labelTopFont.setFamily("Open Sans");
+#endif
+    labelTopFont.setWeight(QFont::Weight::Light);
+    labelTopFont.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, -0.6);
+    labelTopFont.setPixelSize(18);
+    return labelTopFont;
+}
+
+QGraphicsDropShadowEffect* getShadowEffect()
+{
+#if defined(Q_OS_MAC)
+    return nullptr;
+#endif
+    QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect;
+    shadow->setBlurRadius(50);
+    shadow->setColor(darkModeEnabled ? COLOR_SHADOW_DARK : COLOR_SHADOW_LIGHT);
+    shadow->setOffset(8.0);
+    return shadow;
+}
 
 static const std::map<ThemedColor, QColor> themedColors = {
     { ThemedColor::DEFAULT, QColor(0, 0, 0) },
@@ -171,8 +248,9 @@ static std::string DummyAddress(const CChainParams &params)
     sourcedata.insert(sourcedata.end(), dummydata, dummydata + sizeof(dummydata));
     for(int i=0; i<256; ++i) { // Try every trailing byte
         std::string s = EncodeBase58(sourcedata.data(), sourcedata.data() + sourcedata.size());
-        if (!CBitcoinAddress(s).IsValid())
+        if (!IsValidDestinationString(s)) {
             return s;
+        }
         sourcedata[sourcedata.size()-1] += 1;
     }
     return "";
@@ -488,6 +566,22 @@ void openConfigfile()
     /* Open yerbas.conf with the associated application */
     if (fs::exists(pathConfig))
         QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
+}
+
+bool openYerbasConf()
+{
+    boost::filesystem::path pathConfig = GetConfigFile(BITCOIN_CONF_FILENAME);
+
+    /* Create the file */
+    boost::filesystem::ofstream configFile(pathConfig, std::ios_base::app);
+    
+    if (!configFile.good())
+        return false;
+    
+    configFile.close();
+    
+    /* Open yerbas.conf with the associated application */
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
 }
 
 void showBackups()
@@ -1002,6 +1096,9 @@ QString formatServicesStr(quint64 mask)
             case NODE_BLOOM:
                 strList.append("BLOOM");
                 break;
+            case NODE_WITNESS:
+                strList.append("WITNESS");
+                break;
             case NODE_XTHIN:
                 strList.append("XTHIN");
                 break;
@@ -1064,6 +1161,18 @@ QString formatNiceTimeOffset(qint64 secs)
     return timeBehindText;
 }
 
+QString formatBytes(uint64_t bytes)
+{
+    if(bytes < 1024)
+        return QString(QObject::tr("%1 B")).arg(bytes);
+    if(bytes < 1024 * 1024)
+        return QString(QObject::tr("%1 KB")).arg(bytes / 1024);
+    if(bytes < 1024 * 1024 * 1024)
+        return QString(QObject::tr("%1 MB")).arg(bytes / 1024 / 1024);
+
+    return QString(QObject::tr("%1 GB")).arg(bytes / 1024 / 1024 / 1024);
+}
+
 void ClickableLabel::mouseReleaseEvent(QMouseEvent *event)
 {
     Q_EMIT clicked(event->pos());
@@ -1073,5 +1182,73 @@ void ClickableProgressBar::mouseReleaseEvent(QMouseEvent *event)
 {
     Q_EMIT clicked(event->pos());
 }
+void concatenate(QPainter* painter, QString& catString, int static_width, int left_side, int right_size)
+{
+    // Starting length of the name
+    int start_name_length = catString.size();
+
+    // Get the length of the dots
+    #ifndef QTversionPreFiveEleven
+    	int dots_width = painter->fontMetrics().width("...");
+    #else
+    	int dots_width = painter->fontMetrics().width("...");
+    #endif
+
+    // Add the dots width to the amount width
+    static_width += dots_width;
+
+    // Start concatenation loop, end loop if name is at three characters
+    while (catString.size() > 3)
+    {
+        // Get the text width of the current name
+        #ifndef QTversionPreFiveEleven
+        	int text_width = painter->fontMetrics().width(catString);
+        #else
+        	int text_width = painter->fontMetrics().width(catString);
+        #endif
+        // Check to see if the text width is going to overlap the amount width if it doesn't break the loop
+        if (left_side + text_width < right_size - static_width)
+            break;
+
+        // substring the name minus the last character of it and continue the loop
+        catString = catString.left(catString.size() - 1);
+    }
+
+    // Add the ... if the name was concatenated
+    if (catString.size() != start_name_length)
+        catString.append("...");
+}
+
+QDateTime StartOfDay(const QDate& date)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+    return date.startOfDay();
+#else
+    return QDateTime(date);
+#endif
+}
+
+bool HasPixmap(const QLabel* label)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+    return !label->pixmap(Qt::ReturnByValue).isNull();
+#else
+    return label->pixmap() != nullptr;
+#endif
+}
+
+QImage GetImage(const QLabel* label)
+{
+    if (!HasPixmap(label)) {
+        return QImage();
+    }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+    return label->pixmap(Qt::ReturnByValue).toImage();
+#else
+    return label->pixmap()->toImage();
+#endif
+}
+
 
 } // namespace GUIUtil

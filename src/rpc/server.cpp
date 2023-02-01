@@ -15,7 +15,9 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "mining.h"
 
+#include <mutex>
 #include <univalue.h>
 
 #include <boost/bind.hpp>
@@ -27,6 +29,9 @@
 #include <algorithm>
 #include <memory> // for unique_ptr
 #include <unordered_map>
+#include <validation.h>
+
+#include "assets/assets.h"
 
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
@@ -614,4 +619,39 @@ void RPCRunLater(const std::string& name, std::function<void(void)> func, int64_
     deadlineTimers.emplace(name, std::unique_ptr<RPCTimerBase>(timerInterface->NewTimer(func, nSeconds*1000)));
 }
 
+int RPCSerializationFlags()
+{
+    int flag = 0;
+    if (gArgs.GetArg("-rpcserialversion", DEFAULT_RPC_SERIALIZE_VERSION) == 0)
+        flag |= SERIALIZE_TRANSACTION_NO_WITNESS;
+    return flag;
+}
+
+
 CRPCTable tableRPC;
+
+void CheckIPFSTxidMessage(const std::string &message, int64_t expireTime)
+{
+    size_t msglen = message.length();
+    if (msglen == 46 || msglen == 64) {
+        if (msglen == 64 && !AreMessagesDeployed()) {
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid txid hash, only ipfs hashes available until RIP5 is activated"));
+        }
+    } else {
+        if (msglen)
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters), Txid hashes (must be 64 characters)"));
+    }
+
+    bool fNotIPFS = false;
+    if (message.substr(0, 2) != "Qm") {
+        fNotIPFS = true;
+        if (!AreMessagesDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid ipfs hash. Please use a valid ipfs hash. They usually start with Qm"));
+    }
+
+    if (fNotIPFS && !IsHex(message))
+        throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS/Txid hash"));
+
+    if (expireTime < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Expire time must be a positive number"));
+}

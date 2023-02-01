@@ -17,7 +17,13 @@ namespace Consensus {
 enum DeploymentPos
 {
     DEPLOYMENT_TESTDUMMY,
-
+    DEPLOYMENT_ASSETS, // Deployment of RIP2
+    DEPLOYMENT_MSG_REST_ASSETS, // Delpoyment of RIP5 and Restricted assets
+    DEPLOYMENT_TRANSFER_SCRIPT_SIZE,
+    DEPLOYMENT_ENFORCE_VALUE,
+    DEPLOYMENT_COINBASE_ASSETS,
+    // DEPLOYMENT_CSV, // Deployment of BIP68, BIP112, and BIP113.
+//    DEPLOYMENT_SEGWIT, // Deployment of BIP141, BIP143, and BIP147.
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -36,6 +42,10 @@ struct BIP9Deployment {
     int64_t nWindowSize{0};
     /** A number of blocks, in the range of 1..nWindowSize, which must signal for a fork in order to lock it in. */
     int64_t nThreshold{0};
+    /** Use to override the confirmation window on a specific BIP */
+    uint32_t nOverrideMinerConfirmationWindow;
+    /** Use to override the the activation threshold on a specific BIP */
+    uint32_t nOverrideRuleChangeActivationThreshold;
 };
 
 enum LLMQType : uint8_t
@@ -163,6 +173,7 @@ struct Params {
     BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
     /** Proof of work parameters */
     uint256 powLimit;
+    uint256 kawpowLimit;
     bool fPowAllowMinDifficultyBlocks;
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
@@ -172,6 +183,8 @@ struct Params {
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
+    bool nSegwitEnabled;
+    bool nCSVEnabled;
 
     /** these parameters are only used on devnet and can be configured from the outside */
     int nMinimumDifficultyBlocks{0};

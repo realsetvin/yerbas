@@ -11,7 +11,6 @@
 #include "validation.h"
 #include "policy/policy.h"
 #include "policy/fees.h"
-#include "random.h"
 #include "reverse_iterator.h"
 #include "streams.h"
 #include "timedata.h"
@@ -19,6 +18,7 @@
 #include "utilmoneystr.h"
 #include "utiltime.h"
 #include "hash.h"
+#include "random.h"
 
 #include "evo/specialtx.h"
 #include "evo/providertx.h"
@@ -499,6 +499,20 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
             CMempoolAddressDelta delta(entry.GetTime(), prevout.nValue * -1, input.prevout.hash, input.prevout.n);
             mapAddress.insert(std::make_pair(key, delta));
             inserted.push_back(key);
+        } else {
+            /** YERB START */
+            if (AreAssetsDeployed()) {
+                uint160 hashBytes;
+                std::string assetName;
+                CAmount assetAmount;
+                if (ParseAssetScript(prevout.scriptPubKey, hashBytes, assetName, assetAmount)) {
+                    CMempoolAddressDeltaKey key(1, hashBytes, assetName, txhash, j, 1);
+                    CMempoolAddressDelta delta(entry.GetTime(), assetAmount * -1, input.prevout.hash, input.prevout.n);
+                    mapAddress.insert(std::make_pair(key, delta));
+                    inserted.push_back(key);
+                }
+            }
+            /** YERB END */
         }
     }
 
@@ -521,6 +535,20 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
             CMempoolAddressDeltaKey key(1, hashBytes, txhash, k, 0);
             mapAddress.insert(std::make_pair(key, CMempoolAddressDelta(entry.GetTime(), out.nValue)));
             inserted.push_back(key);
+        } else {
+            /** YERB START */
+            if (AreAssetsDeployed()) {
+                uint160 hashBytes;
+                std::string assetName;
+                CAmount assetAmount;
+                if (ParseAssetScript(out.scriptPubKey, hashBytes, assetName, assetAmount)) {
+                    std::pair<addressDeltaMap::iterator, bool> ret;
+                    CMempoolAddressDeltaKey key(1, hashBytes, assetName, txhash, k, 0);
+                    mapAddress.insert(std::make_pair(key, CMempoolAddressDelta(entry.GetTime(), assetAmount)));
+                    inserted.push_back(key);
+                }
+            }
+            /** YERB END */
         }
     }
 
@@ -696,6 +724,90 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
     if (minerPolicyEstimator) {minerPolicyEstimator->removeTx(hash, false);}
     removeAddressIndex(hash);
     removeSpentIndex(hash);
+
+    /** YERB START */
+    // If the transaction being removed from the mempool is locking other reissues. Free them
+    if (mapReissuedTx.count(hash)) {
+        if (mapReissuedAssets.count(mapReissuedTx.at(hash))) {
+            mapReissuedAssets.erase(mapReissuedTx.at((hash)));
+            mapReissuedTx.erase(hash);
+        }
+    }
+
+    // Erase from the asset mempool maps if they match txid
+    if (mapHashToAsset.count(hash)) {
+        mapAssetToHash.erase(mapHashToAsset.at(hash));
+        mapHashToAsset.erase(hash);
+    }
+
+    // Erase from the restricted asset mempool maps if they match txids
+    if (mapHashToAddressMarkedFrozen.count(hash)) {
+        for (auto item : mapHashToAddressMarkedFrozen.at(hash))
+            mapAddressesMarkedFrozen.at(item).erase(hash);
+        mapHashToAddressMarkedFrozen.erase(hash);
+    }
+
+    if (mapHashMarkedGlobalFrozen.count(hash)) {
+        for (auto item : mapHashMarkedGlobalFrozen.at(hash))
+            mapAssetMarkedGlobalFrozen.at(item).erase(hash);
+        mapHashMarkedGlobalFrozen.erase(hash);
+    }
+
+    if (mapHashQualifiersChanged.count(hash)) {
+        for (auto item : mapHashQualifiersChanged.at(hash))
+            mapAddressesQualifiersChanged.at(item).erase(hash);
+        mapHashQualifiersChanged.erase(hash);
+    }
+
+    if (mapHashVerifierChanged.count(hash)) {
+        for (auto item : mapHashVerifierChanged.at(hash))
+            mapAssetVerifierChanged.at(item).erase(hash);
+        mapHashVerifierChanged.erase(hash);
+    }
+
+    if (mapHashGlobalFreezingAssetTransactions.count(hash)) {
+        for (auto item : mapHashGlobalFreezingAssetTransactions.at(hash)) {
+            if (mapGlobalFreezingAssetTransactions.count(item)) {
+                mapGlobalFreezingAssetTransactions.at(item).erase(hash);
+                if (mapGlobalFreezingAssetTransactions.at(item).size() == 0)
+                    mapGlobalFreezingAssetTransactions.erase(item);
+            }
+        }
+        mapHashGlobalFreezingAssetTransactions.erase(hash);
+    }
+
+    if (mapHashGlobalUnFreezingAssetTransactions.count(hash)) {
+        for (auto item : mapHashGlobalUnFreezingAssetTransactions.at(hash)) {
+            if (mapGlobalUnFreezingAssetTransactions.count(item)) {
+                mapGlobalUnFreezingAssetTransactions.at(item).erase(hash);
+                if (mapGlobalUnFreezingAssetTransactions.at(item).size() == 0)
+                    mapGlobalUnFreezingAssetTransactions.erase(item);
+            }
+        }
+        mapHashGlobalUnFreezingAssetTransactions.erase(hash);
+    }
+
+    if (mapHashToAddressAddedTag.count(hash)) {
+        for (auto item : mapHashToAddressAddedTag.at(hash)) {
+            if (mapAddressAddedTag.count(item)) {
+                mapAddressAddedTag.at(item).erase(hash);
+                if (mapAddressAddedTag.at(item).size() == 0)
+                    mapAddressAddedTag.erase(item);
+            }
+        }
+    }
+
+    if (mapHashToAddressRemoveTag.count(hash)) {
+        for (auto item : mapHashToAddressRemoveTag.at(hash)) {
+            if (mapAddressRemoveTag.count(item)) {
+                mapAddressRemoveTag.at(item).erase(hash);
+                if (mapAddressRemoveTag.at(item).size() == 0)
+                    mapAddressRemoveTag.erase(item);
+            }
+        }
+    }
+    /** YERB END */
+
 }
 
 // Calculates descendants of entry that are not already in setDescendants, and adds to
@@ -951,13 +1063,22 @@ void CTxMemPool::removeProTxConflicts(const CTransaction &tx)
         removeProTxKeyChangedConflicts(tx, proTx.proTxHash, ::SerializeHash(CBLSPublicKey()));
     }
 }
-
 /**
  * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
  */
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight)
 {
+    ConnectedBlockAssetData connectedBlockAssetData;
+    removeForBlock(vtx, nBlockHeight, connectedBlockAssetData);
+}
+
+/**
+ * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
+ */
+void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight, ConnectedBlockAssetData& connectedBlockData)
+{
     LOCK(cs);
+    std::set<uint256> setAlreadyRemoving;
     std::vector<const CTxMemPoolEntry*> entries;
     for (const auto& tx : vtx)
     {
@@ -967,6 +1088,120 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
         if (i != mapTx.end())
             entries.push_back(&*i);
     }
+
+    /** YERB START */
+    // Get the newly added assets, and make sure they are in the entries
+    std::vector<CTransaction> trans;
+    for (auto it : connectedBlockData.newAssetsToAdd) {
+        if (mapAssetToHash.count(it.asset.strName)) {
+            indexed_transaction_set::iterator i = mapTx.find(mapAssetToHash.at(it.asset.strName));
+            if (i != mapTx.end()) {
+                entries.push_back(&*i);
+                trans.emplace_back(i->GetTx());
+                setAlreadyRemoving.insert(mapAssetToHash.at(it.asset.strName));
+            }
+        }
+    }
+
+    for (auto it : connectedBlockData.newVerifiersToAdd) {
+        if (mapAssetVerifierChanged.count(it.assetName)) {
+            for (auto hash : mapAssetVerifierChanged.at(it.assetName)) {
+                indexed_transaction_set::iterator i = mapTx.find(hash);
+                if (i != mapTx.end()) {
+                    CValidationState state;
+                    if (!setAlreadyRemoving.count(hash) && !CheckTransaction(i->GetTx(), state, passets)) {
+                        entries.push_back(&*i);
+                        trans.emplace_back(i->GetTx());
+                        setAlreadyRemoving.insert(hash);
+                    }
+                }
+            }
+        }
+    }
+
+    for (auto it : connectedBlockData.newQualifiersToAdd) {
+        if (mapAddressesQualifiersChanged.count(it.address)) {
+            for (auto hash : mapAddressesQualifiersChanged.at(it.address)) {
+                indexed_transaction_set::iterator i = mapTx.find(hash);
+                if (i != mapTx.end()) {
+                    CValidationState state;
+                    if (!setAlreadyRemoving.count(hash) && !CheckTransaction(i->GetTx(), state, passets)) {
+                        entries.push_back(&*i);
+                        trans.emplace_back(i->GetTx());
+                        setAlreadyRemoving.insert(hash);
+                    }
+                }
+            }
+        }
+    }
+
+    for (auto it : connectedBlockData.newGlobalRestrictionsToAdd) {
+        if (it.type == RestrictedType::GLOBAL_FREEZE) {
+            if (mapAssetMarkedGlobalFrozen.count(it.assetName)) {
+                for (auto hash : mapAssetMarkedGlobalFrozen.at(it.assetName)) {
+                    indexed_transaction_set::iterator i = mapTx.find(hash);
+                    if (i != mapTx.end()) {
+                        CValidationState state;
+                        if (!setAlreadyRemoving.count(hash) && !CheckTransaction(i->GetTx(), state, passets)) {
+                            entries.push_back(&*i);
+                            trans.emplace_back(i->GetTx());
+                            setAlreadyRemoving.insert(hash);
+                        }
+                    }
+                }
+            }
+
+            if (mapGlobalFreezingAssetTransactions.count(it.assetName)) {
+                for (auto hash : mapGlobalFreezingAssetTransactions.at(it.assetName)) {
+                    indexed_transaction_set::iterator i = mapTx.find(hash);
+                    if (i != mapTx.end()) {
+                        CValidationState state;
+                        if (!setAlreadyRemoving.count(hash)) {
+                            entries.push_back(&*i);
+                            trans.emplace_back(i->GetTx());
+                            setAlreadyRemoving.insert(hash);
+                        }
+                    }
+                }
+            }
+        } else if (it.type == RestrictedType::GLOBAL_UNFREEZE) {
+            if (mapGlobalUnFreezingAssetTransactions.count(it.assetName)) {
+                for (auto hash : mapGlobalUnFreezingAssetTransactions.at(it.assetName)) {
+                    indexed_transaction_set::iterator i = mapTx.find(hash);
+                    if (i != mapTx.end()) {
+                        CValidationState state;
+                        if (!setAlreadyRemoving.count(hash)) {
+                            entries.push_back(&*i);
+                            trans.emplace_back(i->GetTx());
+                            setAlreadyRemoving.insert(hash);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (auto it : connectedBlockData.newAddressRestrictionsToAdd) {
+        if (it.type == RestrictedType::FREEZE_ADDRESS) {
+            auto pair = std::make_pair(it.address, it.assetName);
+            if (mapAddressesMarkedFrozen.count(pair)) {
+                for (auto hash : mapAddressesMarkedFrozen.at(pair)) {
+                    indexed_transaction_set::iterator i = mapTx.find(hash);
+                    if (i != mapTx.end()) {
+                        CValidationState state;
+                        std::vector<std::pair<std::string, uint256>> vReissueAssets;
+                        if (!setAlreadyRemoving.count(hash) && !Consensus::CheckTxAssets(i->GetTx(), state, pcoinsTip, passets, false, vReissueAssets)) {
+                            entries.push_back(&*i);
+                            trans.emplace_back(i->GetTx());
+                            setAlreadyRemoving.insert(hash);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    /** YERB END */
+
     // Before the txs in the new block have been removed from the mempool, update policy estimates
     if (minerPolicyEstimator) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
     for (const auto& tx : vtx)
@@ -981,6 +1216,22 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
         removeProTxConflicts(*tx);
         ClearPrioritisation(tx->GetHash());
     }
+
+   /** YERB START */
+    // Remove newly added asset issue transactions from the mempool if they haven't been removed already
+    for (auto tx : trans)
+    {
+        txiter it = mapTx.find(tx.GetHash());
+        if (it != mapTx.end()) {
+            setEntries stage;
+            stage.insert(it);
+            RemoveStaged(stage, true, MemPoolRemovalReason::BLOCK);
+        }
+        removeConflicts(tx);
+        ClearPrioritisation(tx.GetHash());
+    }
+    /** YERB END */
+
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
 }
@@ -998,6 +1249,8 @@ void CTxMemPool::_clear()
     blockSinceLastRollingFeeBump = false;
     rollingMinimumFeeRate = 0;
     ++nTransactionsUpdated;
+    mapAssetToHash.clear();
+    mapHashToAsset.clear();
 }
 
 void CTxMemPool::clear()
@@ -1011,6 +1264,16 @@ static void CheckInputsAndUpdateCoins(const CTransaction& tx, CCoinsViewCache& m
     CValidationState state;
     CAmount txfee = 0;
     bool fCheckResult = tx.IsCoinBase() || Consensus::CheckTxInputs(tx, state, mempoolDuplicate, spendheight, txfee);
+
+    /** YERB START */
+    if (AreAssetsDeployed()) {
+        std::vector<std::pair<std::string, uint256>> vReissueAssets;
+        bool fCheckAssets = Consensus::CheckTxAssets(tx, state, mempoolDuplicate, passets, false, vReissueAssets);
+        assert(fCheckResult && fCheckAssets);
+    } else
+        assert(fCheckResult);
+    /** YERB END */
+
     assert(fCheckResult);
     UpdateCoins(tx, mempoolDuplicate, 1000000);
 }

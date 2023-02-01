@@ -10,6 +10,26 @@ const struct VBDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_B
         /*.name =*/ "testdummy",
         /*.gbt_force =*/ true,
         /*.check_mn_protocol =*/ false,
+    },
+    {
+            /*.name =*/ "assets",
+            /*.gbt_force =*/ true,
+    },
+    {
+            /*.name =*/ "messaging_restricted",
+            /*.gbt_force =*/ true,
+    },
+    {
+            /*.name =*/ "transfer_script",
+            /*.gbt_force =*/ true,
+    },
+    {
+            /*.name =*/ "enforce_value",
+            /*.gbt_force =*/ true,
+    },
+    {
+            /*.name =*/ "coinbase",
+            /*.gbt_force =*/ true,
     }
 };
 

@@ -10,6 +10,7 @@
 #include "clientversion.h"
 #include "core_io.h"
 #include "init.h"
+#include "validation.h"
 #include "httpserver.h"
 #include "net.h"
 #include "netbase.h"
@@ -19,7 +20,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "validation.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -371,7 +372,8 @@ UniValue validateaddress(const JSONRPCRequest& request)
 #endif
 
     CBitcoinAddress address(request.params[0].get_str());
-    bool isValid = address.IsValid();
+    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    bool isValid = IsValidDestination(dest);
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("isvalid", isValid));
@@ -452,6 +454,21 @@ CScript _createmultisig_redeemScript(CWallet * const pwallet, const UniValue& pa
             if (!pwallet->GetPubKey(keyID, vchPubKey)) {
                 throw std::runtime_error(
                     strprintf("no full public key for address %s",ks));
+            }
+            if (!vchPubKey.IsFullyValid())
+                throw std::runtime_error(" Invalid public key: "+ks);
+            pubkeys[i] = vchPubKey;
+        }
+
+        CTxDestination dest = DecodeDestination(ks);
+        if (pwallet && IsValidDestination(dest)) {
+            const CKeyID *keyID = boost::get<CKeyID>(&dest);
+            if (!keyID) {
+                throw std::runtime_error(strprintf("%s does not refer to a key", ks));
+            }
+            CPubKey vchPubKey;
+            if (!pwallet->GetPubKey(*keyID, vchPubKey)) {
+                throw std::runtime_error(strprintf("no full public key for address %s", ks));
             }
             if (!vchPubKey.IsFullyValid())
                 throw std::runtime_error(" Invalid public key: "+ks);
@@ -559,6 +576,11 @@ UniValue verifymessage(const JSONRPCRequest& request)
     std::string strAddress  = request.params[0].get_str();
     std::string strSign     = request.params[1].get_str();
     std::string strMessage  = request.params[2].get_str();
+
+    CTxDestination destination = DecodeDestination(strAddress);
+    if (!IsValidDestination(destination)) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
+    }
 
     CBitcoinAddress addr(strAddress);
     if (!addr.IsValid())
@@ -725,11 +747,13 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
             "    ]\n"
-            "}\n"
+            "},\n"
+            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset deltas\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
             "    \"address\"  (string) The base58check encoded address\n"
+            "    \"assetName\"  (string) The name of the associated asset (YERB for Yerbascoin)\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
             "    \"satoshis\"  (number) The difference of duffs\n"
@@ -741,6 +765,8 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
             "\nExamples:\n"
             + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
             + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
+            + HelpExampleCli("getaddressmempool", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
+            + HelpExampleRpc("getaddressmempool", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -749,10 +775,25 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
 
+    bool includeAssets = false;
+    if (request.params.size() > 1) {
+        includeAssets = request.params[1].get_bool();
+    }
+
+    if (includeAssets)
+        if (!AreAssetsDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
+
     std::vector<std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> > indexes;
 
-    if (!mempool.getAddressIndex(addresses, indexes)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+    if (includeAssets) {
+        if (!mempool.getAddressIndex(addresses, indexes)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+        }
+    } else {
+        if (!mempool.getAddressIndex(addresses, YERB, indexes)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+        }
     }
 
     std::sort(indexes.begin(), indexes.end(), timestampSort);
@@ -769,6 +810,7 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
 
         UniValue delta(UniValue::VOBJ);
         delta.push_back(Pair("address", address));
+        delta.push_back(Pair("assetName", it->first.asset));
         delta.push_back(Pair("txid", it->first.txhash.GetHex()));
         delta.push_back(Pair("index", (int)it->first.index));
         delta.push_back(Pair("satoshis", it->second.amount));
@@ -793,14 +835,17 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             "{\n"
             "  \"addresses\"\n"
             "    [\n"
-            "      \"address\"  (string) The base58check encoded address\n"
+             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
-            "    ]\n"
+            "    ],\n"
+            "  \"chainInfo\",  (boolean, optional, default false) Include chain info with results\n"
+            "  \"assetName\"   (string, optional) Get UTXOs for a particular asset instead of YERB ('*' for all assets).\n"
             "}\n"
-            "\nResult:\n"
+            "\nResult\n"
             "[\n"
             "  {\n"
             "    \"address\"  (string) The address base58check encoded\n"
+            "    \"assetName\" (string) The asset associated with the UTXOs (YERB for Yerbascoin)\n"
             "    \"txid\"  (string) The output txid\n"
             "    \"outputIndex\"  (number) The output index\n"
             "    \"script\"  (string) The script hex encoded\n"
@@ -811,7 +856,24 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             "\nExamples:\n"
             + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
             + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
         );
+
+    bool includeChainInfo = false;
+    std::string assetName = YERB;
+    if (request.params[0].isObject()) {
+        UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
+        if (chainInfo.isBool()) {
+            includeChainInfo = chainInfo.get_bool();
+        }
+        UniValue assetNameParam = find_value(request.params[0].get_obj(), "assetName");
+        if (assetNameParam.isStr()) {
+            if (!AreAssetsDeployed())
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
+            assetName = assetNameParam.get_str();
+        }
+    }
 
     std::vector<std::pair<uint160, int> > addresses;
 
@@ -822,8 +884,14 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-        if (!GetAddressUnspent((*it).first, (*it).second, unspentOutputs)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+        if (assetName == "*") {
+            if (!GetAddressUnspent((*it).first, (*it).second, unspentOutputs)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        } else {
+            if (!GetAddressUnspent((*it).first, (*it).second, assetName, unspentOutputs)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
         }
     }
 
@@ -838,7 +906,17 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
         }
 
+        std::string assetNameOut = "YERB";
+        if (assetName != "YERB") {
+            CAmount _amount;
+            if (!GetAssetInfoFromScript(it->second.script, assetNameOut, _amount)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't decode asset script");
+            }
+        }
+
+
         output.push_back(Pair("address", address));
+        output.push_back(Pair("assetName", assetNameOut));
         output.push_back(Pair("txid", it->first.txhash.GetHex()));
         output.push_back(Pair("outputIndex", (int)it->first.index));
         output.push_back(Pair("script", HexStr(it->second.script.begin(), it->second.script.end())));
@@ -865,11 +943,14 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
             "    ]\n"
             "  \"start\" (number) The start block height\n"
             "  \"end\" (number) The end block height\n"
+            "  \"chainInfo\" (boolean) Include chain info in results, only applies if start and end specified\n"
+            "  \"assetName\"   (string, optional) Get deltas for a particular asset instead of YERB.\n"
             "}\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
-            "    \"satoshis\"  (number) The difference of duffs\n"
+            "    \"assetName\"  (string) The asset associated with the deltas (YERB for Yerbascoin)\n"
+            "    \"satoshis\"  (number) The difference of satoshis\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
             "    \"blockindex\"  (number) The related block index\n"
@@ -880,11 +961,27 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
             "\nExamples:\n"
             + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
             + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
         );
 
 
     UniValue startValue = find_value(request.params[0].get_obj(), "start");
     UniValue endValue = find_value(request.params[0].get_obj(), "end");
+
+    UniValue chainInfo = find_value(request.params[0].get_obj(), "chainInfo");
+    bool includeChainInfo = false;
+    if (chainInfo.isBool()) {
+        includeChainInfo = chainInfo.get_bool();
+    }
+
+    std::string assetName = YERB;
+    UniValue assetNameParam = find_value(request.params[0].get_obj(), "assetName");
+    if (assetNameParam.isStr()) {
+        if (!AreAssetsDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
+        assetName = assetNameParam.get_str();
+    }
 
     int start = 0;
     int end = 0;
@@ -907,11 +1004,11 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
 
     for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
         if (start > 0 && end > 0) {
-            if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
+            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex, start, end)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         } else {
-            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
             }
         }
@@ -926,6 +1023,7 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
         }
 
         UniValue delta(UniValue::VOBJ);
+        delta.push_back(Pair("assetName", it->first.asset));
         delta.push_back(Pair("satoshis", it->second));
         delta.push_back(Pair("txid", it->first.txhash.GetHex()));
         delta.push_back(Pair("index", (int)it->first.index));
@@ -940,26 +1038,38 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
 
 UniValue getaddressbalance(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() != 1)
+    if (request.fHelp || request.params.size() > 2)
         throw std::runtime_error(
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
             "{\n"
-            "  \"addresses\"\n"
+            "  \"addresses:\"\n"
             "    [\n"
             "      \"address\"  (string) The base58check encoded address\n"
             "      ,...\n"
             "    ]\n"
-            "}\n"
+            "},\n"
+            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset balances\n"
+            "\n"
             "\nResult:\n"
             "{\n"
-            "  \"balance\"  (string) The current balance in duffs\n"
-            "  \"received\"  (string) The total number of duffs received (including change)\n"
+            "  \"balance\"  (string) The current balance in satoshis\n"
+            "  \"received\"  (string) The total number of satoshis received (including change)\n"
             "}\n"
+            "OR\n"
+            "[\n"
+            "  {\n"
+            "    \"assetName\"  (string) The asset associated with the balance (YERB for Yerbascoin)\n"
+            "    \"balance\"  (string) The current balance in satoshis\n"
+            "    \"received\"  (string) The total number of satoshis received (including change)\n"
+            "  },...\n"
+            "\n]"
             "\nExamples:\n"
-            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}'")
-            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"XwnLY9Tf7Zsef8gMGL2fhWA9ZmMjt4KPwg\"]}")
+            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
+            + HelpExampleCli("getaddressbalance", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
+            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
+            + HelpExampleRpc("getaddressbalance", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
         );
 
     std::vector<std::pair<uint160, int> > addresses;
@@ -968,29 +1078,77 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
     }
 
-    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
-
-    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
-        if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
-        }
+    bool includeAssets = false;
+    if (request.params.size() > 1) {
+        includeAssets = request.params[1].get_bool();
     }
 
-    CAmount balance = 0;
-    CAmount received = 0;
+    if (includeAssets) {
+        if (!AreAssetsDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
 
-    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
-        if (it->second > 0) {
-            received += it->second;
+        std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+        for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+            if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
         }
-        balance += it->second;
+
+        //assetName -> (received, balance)
+        std::map<std::string, std::pair<CAmount, CAmount>> balances;
+
+        for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it = addressIndex.begin();
+             it != addressIndex.end(); it++) {
+            std::string assetName = it->first.asset;
+            if (balances.count(assetName) == 0) {
+                balances[assetName] = std::make_pair(0, 0);
+            }
+            if (it->second > 0) {
+                balances[assetName].first += it->second;
+            }
+            balances[assetName].second += it->second;
+        }
+
+        UniValue result(UniValue::VARR);
+
+        for (std::map<std::string, std::pair<CAmount, CAmount>>::const_iterator it = balances.begin();
+                it != balances.end(); it++) {
+            UniValue balance(UniValue::VOBJ);
+            balance.push_back(Pair("assetName", it->first));
+            balance.push_back(Pair("balance", it->second.second));
+            balance.push_back(Pair("received", it->second.first));
+            result.push_back(balance);
+        }
+
+        return result;
+
+    } else {
+        std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+        for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+            if (!GetAddressIndex((*it).first, (*it).second, YERB, addressIndex)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        }
+
+        CAmount balance = 0;
+        CAmount received = 0;
+
+        for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it = addressIndex.begin();
+             it != addressIndex.end(); it++) {
+            if (it->second > 0) {
+                received += it->second;
+            }
+            balance += it->second;
+        }
+
+        UniValue result(UniValue::VOBJ);
+        result.push_back(Pair("balance", balance));
+        result.push_back(Pair("received", received));
+
+        return result;
     }
-
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("balance", balance));
-    result.push_back(Pair("received", received));
-
-    return result;
 
 }
 
@@ -1287,38 +1445,3 @@ UniValue echo(const JSONRPCRequest& request)
     return request.params;
 }
 
-static const CRPCCommand commands[] =
-{ //  category              name                      actor (function)         okSafeMode
-  //  --------------------- ------------------------  -----------------------  ----------
-    { "control",            "debug",                  &debug,                  true,  {} },
-    { "control",            "getinfo",                &getinfo,                true,  {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {"mode"} },
-    { "util",               "validateaddress",        &validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         &createmultisig,         true,  {"nrequired","keys"} },
-    { "util",               "verifymessage",          &verifymessage,          true,  {"address","signature","message"} },
-    { "util",               "signmessagewithprivkey", &signmessagewithprivkey, true,  {"privkey","message"} },
-    { "blockchain",         "getspentinfo",           &getspentinfo,           false, {"json"} },
-
-    /* Address index */
-    { "addressindex",       "getaddressmempool",      &getaddressmempool,      true,  {"addresses"}  },
-    { "addressindex",       "getaddressutxos",        &getaddressutxos,        false, {"addresses"} },
-    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false, {"addresses"} },
-    { "addressindex",       "getaddresstxids",        &getaddresstxids,        false, {"addresses"} },
-    { "addressindex",       "getaddressbalance",      &getaddressbalance,      false, {"addresses"} },
-
-    /* Yerbas features */
-    { "yerbas",               "mnsync",                 &mnsync,                 true,  {} },
-    { "yerbas",               "spork",                  &spork,                  true,  {"value"} },
-
-    /* Not shown in help */
-    { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},
-    { "hidden",             "echo",                   &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "echojson",               &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "logging",                &logging,                true,  {"include", "exclude"}},
-};
-
-void RegisterMiscRPCCommands(CRPCTable &t)
-{
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
-}

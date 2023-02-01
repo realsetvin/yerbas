@@ -46,6 +46,7 @@ public:
     virtual bool NotifyGovernanceVote(const CGovernanceVote &vote);
     virtual bool NotifyGovernanceObject(const CGovernanceObject &object);
     virtual bool NotifyInstantSendDoubleSpendAttempt(const CTransaction &currentTx, const CTransaction &previousTx);
+    virtual bool NotifyMessage(const CMessage& message);
 
 
 protected:

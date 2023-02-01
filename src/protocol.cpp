@@ -72,6 +72,9 @@ const char *QSIGREC="qsigrec";
 const char *CLSIG="clsig";
 const char *ISLOCK="islock";
 const char *MNAUTH="mnauth";
+const char *GETASSETDATA="getassetdata";
+const char *ASSETDATA="assetdata";
+const char *ASSETNOTFOUND ="asstnotfound";
 }; // namespace NetMsgType
 
 /** All known message types. Keep this in the same order as the list of
@@ -138,6 +141,9 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::CLSIG,
     NetMsgType::ISLOCK,
     NetMsgType::MNAUTH,
+    NetMsgType::GETASSETDATA,
+    NetMsgType::ASSETDATA,
+    NetMsgType::ASSETNOTFOUND
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes, allNetMessageTypes+ARRAYLEN(allNetMessageTypes));
 
@@ -258,11 +264,19 @@ const char* CInv::GetCommandInternal() const
 
 std::string CInv::GetCommand() const
 {
-    auto cmd = GetCommandInternal();
-    if (cmd == nullptr) {
+    std::string cmd;
+    if (type & MSG_WITNESS_FLAG)
+        cmd.append("witness-");
+    int masked = type & MSG_TYPE_MASK;
+    switch (masked)
+    {
+    case MSG_TX:             return cmd.append(NetMsgType::TX);
+    case MSG_BLOCK:          return cmd.append(NetMsgType::BLOCK);
+    case MSG_FILTERED_BLOCK: return cmd.append(NetMsgType::MERKLEBLOCK);
+    case MSG_CMPCT_BLOCK:    return cmd.append(NetMsgType::CMPCTBLOCK);
+    default:
         throw std::out_of_range(strprintf("CInv::GetCommand(): type=%d unknown type", type));
     }
-    return cmd;
 }
 
 std::string CInv::ToString() const
@@ -278,4 +292,21 @@ std::string CInv::ToString() const
 const std::vector<std::string> &getAllNetMessageTypes()
 {
     return allNetMessageTypesVec;
+}
+
+CInvAsset::CInvAsset()
+{
+    name = "";
+}
+
+CInvAsset::CInvAsset(std::string strName) : name(strName){}
+
+bool operator<(const CInvAsset& a, const CInvAsset& b)
+{
+    return a.name < b.name;
+}
+
+std::string CInvAsset::ToString() const
+{
+    return strprintf("%s %s", "CInvAsset for asset: ", name);
 }

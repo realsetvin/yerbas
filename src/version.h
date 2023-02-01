@@ -12,13 +12,16 @@
  */
 
 
-static const int PROTOCOL_VERSION = 70221;
+static const int PROTOCOL_VERSION = 70222;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
 
 //! In this version, 'getheaders' was introduced.
 static const int GETHEADERS_VERSION = 70077;
+
+//! assetdata network request is allowed for this version
+static const int ASSETDATA_VERSION = 70222;
 
 //! disconnect from peers older than this proto version
 static const int MIN_PEER_PROTO_VERSION = 70220;
@@ -54,5 +57,12 @@ static const int LLMQS_PROTO_VERSION = 70214;
 //! introduction of SENDDSQUEUE
 //! TODO we can remove this in 0.15.0.0
 static const int SENDDSQUEUE_PROTO_VERSION = 70214;
+
+//! getassetdata reutrn asstnotfound, and assetdata doesn't have blockhash in the data
+static const int ASSETDATA_VERSION_UPDATED = 70021;
+
+//! In this version, 'rip5 (messaging and restricted assets)' was introduced
+static const int MESSAGING_RESTRICTED_ASSETS_VERSION = 70026;
+
 
 #endif // BITCOIN_VERSION_H

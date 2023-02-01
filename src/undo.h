@@ -60,7 +60,12 @@ public:
     TxInUndoDeserializer(Coin* coin) : txout(coin) {}
 };
 
-static const size_t MAX_INPUTS_PER_BLOCK = MaxBlockSize(true) / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
+static const size_t MIN_TRANSACTION_INPUT_WEIGHT = WITNESS_SCALE_FACTOR * ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
+/** YERB START */
+// Deprecated for RIP2 implementation
+//static const size_t MAX_INPUTS_PER_BLOCK = /*fAssetsIsActive ? MAX_BLOCK_WEIGHT_RIP2 / MIN_TRANSACTION_INPUT_WEIGHT :*/ MAX_BLOCK_WEIGHT / MIN_TRANSACTION_INPUT_WEIGHT;
+
+/** YERB END */
 
 /** Undo information for a CTransaction */
 class CTxUndo
@@ -84,8 +89,14 @@ public:
         // TODO: avoid reimplementing vector deserializer
         uint64_t count = 0;
         ::Unserialize(s, COMPACTSIZE(count));
-        if (count > MAX_INPUTS_PER_BLOCK) {
-            throw std::ios_base::failure("Too many input undo records");
+        if (fAssetsIsActive) {
+            if (count > MAX_BLOCK_WEIGHT_RIP2 / MIN_TRANSACTION_INPUT_WEIGHT) {
+                throw std::ios_base::failure("Too many input undo records");
+            }
+        } else {
+            if (count > MAX_BLOCK_WEIGHT / MIN_TRANSACTION_INPUT_WEIGHT) {
+                throw std::ios_base::failure("Too many input undo records");
+            }
         }
         vprevout.resize(count);
         for (auto& prevout : vprevout) {
@@ -93,6 +104,7 @@ public:
         }
     }
 };
+
 
 /** Undo information for a CBlock */
 class CBlockUndo

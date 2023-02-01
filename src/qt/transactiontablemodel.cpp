@@ -33,7 +33,8 @@ static int column_alignments[] = {
         Qt::AlignLeft|Qt::AlignVCenter, /* date */
         Qt::AlignLeft|Qt::AlignVCenter, /* type */
         Qt::AlignLeft|Qt::AlignVCenter, /* address */
-        Qt::AlignRight|Qt::AlignVCenter /* amount */
+        Qt::AlignRight|Qt::AlignVCenter, /* amount */
+        Qt::AlignLeft|Qt::AlignVCenter /* assetName */
     };
 
 // Comparison operator for sort/binary search of model tx list
@@ -259,7 +260,7 @@ TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle
         fProcessingQueuedTransactions(false),
         platformStyle(_platformStyle)
 {
-    columns << QString() << QString() << QString() << tr("Date") << tr("Type") << tr("Address / Label") << BitcoinUnits::getAmountColumnTitle(walletModel->getOptionsModel()->getDisplayUnit());
+    columns << QString() << QString() << QString() << tr("Date") << tr("Type") << tr("Address / Label") << tr("Asset") << BitcoinUnits::getAmountColumnTitle(walletModel->getOptionsModel()->getDisplayUnit());
     priv->refreshWallet();
 
     connect(walletModel->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
@@ -414,6 +415,15 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     case TransactionRecord::Generated:
         return tr("Mined");
 
+    case TransactionRecord::Issue:
+        return tr("Asset Issued");
+    case TransactionRecord::Reissue:
+        return tr("Asset Reissued");
+    case TransactionRecord::TransferFrom:
+        return tr("Assets Received");
+    case TransactionRecord::TransferTo:
+        return tr("Assets Sent");
+
     case TransactionRecord::PrivateSendDenominate:
         return tr("PrivateSend Denominate");
     case TransactionRecord::PrivateSendCollateralPayment:
@@ -444,6 +454,12 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
     case TransactionRecord::SendToAddress:
     case TransactionRecord::SendToOther:
         return QIcon(":/icons/tx_output");
+    case TransactionRecord::Issue:
+    case TransactionRecord::Reissue:
+    case TransactionRecord::TransferFrom:
+        return QIcon(":/icons/tx_asset_input");
+    case TransactionRecord::TransferTo:
+        return QIcon(":/icons/tx_asset_output");
     default:
         return QIcon(":/icons/tx_inout");
     }
@@ -504,11 +520,23 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
 
 QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx, bool showUnconfirmed, BitcoinUnits::SeparatorStyle separators) const
 {
-    QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), wtx->credit + wtx->debit, false, separators);
-    if(showUnconfirmed)
-    {
-        if(!wtx->status.countsForBalance)
-        {
+    QString str;
+    switch(wtx->type) {
+        case TransactionRecord::Issue:
+        case TransactionRecord::Reissue:
+        case TransactionRecord::TransferTo:
+        case TransactionRecord::TransferFrom:
+            {
+            str = QString::fromStdString(ValueFromAmountString(wtx->credit, wtx->units));
+            } break;
+        default:
+            {
+            str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), wtx->credit + wtx->debit,
+                                             false, separators);
+            } break;
+    }
+    if (showUnconfirmed) {
+        if (!wtx->status.countsForBalance) {
             str = QString("[") + str + QString("]");
         }
     }
@@ -600,6 +628,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return txInstantSendDecoration(rec);
         case ToAddress:
             return txAddressDecoration(rec);
+        case AssetName:
+            return QString::fromStdString(rec->assetName);
         }
         break;
     case Qt::DecorationRole:
@@ -617,6 +647,9 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return formatTxToAddress(rec, false);
         case Amount:
             return formatTxAmount(rec, true, BitcoinUnits::separatorAlways);
+        case AssetName:
+            if (rec->assetName != "YERB")
+               return QString::fromStdString(rec->assetName);
         }
         break;
     case Qt::EditRole:
@@ -637,6 +670,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return formatTxToAddress(rec, true);
         case Amount:
             return qint64(rec->credit + rec->debit);
+        case AssetName:
+            return QString::fromStdString(rec->assetName);
         }
         break;
     case Qt::ToolTipRole:
@@ -666,6 +701,13 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         {
             return addressColor(rec);
         }
+
+        if(index.column() == AssetName)
+        {
+            if (rec->assetName != "YERB")
+               return platformStyle->AssetTxColor();
+        }
+
         return GUIUtil::getThemedQColor(GUIUtil::ThemedColor::DEFAULT);
     case TypeRole:
         return rec->type;
@@ -727,6 +769,15 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
     case FormattedAmountRole:
         // Used for copy/export, so don't include separators
         return formatTxAmount(rec, false, BitcoinUnits::separatorNever);
+    case AssetNameRole:
+        {
+            QString assetName;
+            if (rec->assetName != "YERB")
+               assetName.append(QString::fromStdString(rec->assetName));
+            else
+               assetName.append(QString(BitcoinUnits::name(walletModel->getOptionsModel()->getDisplayUnit())));
+            return assetName;
+        }
     case StatusRole:
         return rec->status.status;
     }
@@ -762,6 +813,8 @@ QVariant TransactionTableModel::headerData(int section, Qt::Orientation orientat
                 return tr("User-defined intent/purpose of the transaction.");
             case Amount:
                 return tr("Amount removed from or added to balance.");
+            case AssetName:
+                return tr("The asset (or YERB) removed or added to balance.");
             }
         }
     }

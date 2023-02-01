@@ -32,6 +32,11 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
+    //KAAAWWWPOW data
+    uint32_t nHeight;
+    uint64_t nNonce64;
+    uint256 mix_hash;
+
     CBlockHeader()
     {
         SetNull();

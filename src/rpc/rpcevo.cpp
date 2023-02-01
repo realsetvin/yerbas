@@ -47,7 +47,7 @@ extern UniValue sendrawtransaction(const JSONRPCRequest& request);
 
 static std::string get_current_dir() {
    char buff[FILENAME_MAX]; //create string buffer to hold path
-   GetCurrentDir( buff, FILENAME_MAX );
+   GetCurrentDir(buff, FILENAME_MAX );
    string current_working_dir(buff);
    return current_working_dir;
 }
@@ -386,7 +386,7 @@ static void FundSpecialTx(CWallet* pwallet, CMutableTransaction& tx, const Speci
     int nChangePos = -1;
     std::string strFailReason;
 
-    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFee, nChangePos, strFailReason, coinControl, false, tx.vExtraPayload.size())) {
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFee, nChangePos, strFailReason, coinControl, false)) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, strFailReason);
     }
 

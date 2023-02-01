@@ -28,9 +28,11 @@ struct CBlockTemplate
     CBlock block;
     std::vector<CAmount> vTxFees;
     std::vector<int64_t> vTxSigOps;
+    std::vector<int64_t> vTxSigOpsCost;
     uint32_t nPrevBits; // nBits of previous block (for subsidy calculation)
     std::vector<CTxOut> voutSmartnodePayments; // smartnode payment
     std::vector<CTxOut> voutSuperblockPayments; // superblock payment
+    std::vector<unsigned char> vchCoinbaseCommitment;
 };
 
 // Container for tracking updates to ancestor feerate as we include (parent)
@@ -47,6 +49,7 @@ struct CTxMemPoolModifiedEntry {
     CTxMemPool::txiter iter;
     uint64_t nSizeWithAncestors;
     CAmount nModFeesWithAncestors;
+    int64_t nSigOpCostWithAncestors;
     unsigned int nSigOpCountWithAncestors;
 };
 
@@ -141,10 +144,13 @@ private:
     CBlock* pblock;
 
     // Configuration parameters for the block size
+    bool fIncludeWitness;
+    unsigned int nBlockMaxWeight;
     unsigned int nBlockMaxSize;
     CFeeRate blockMinFeeRate;
 
     // Information on the current status of the block
+    uint64_t nBlockWeight;
     uint64_t nBlockSize;
     uint64_t nBlockTx;
     unsigned int nBlockSigOps;
@@ -159,15 +165,15 @@ private:
 public:
     struct Options {
         Options();
-        size_t nBlockMaxSize;
+        size_t nBlockMaxWeight;
         CFeeRate blockMinFeeRate;
     };
 
-    BlockAssembler(const CChainParams& params);
+    explicit BlockAssembler(const CChainParams& params);
     BlockAssembler(const CChainParams& params, const Options& options);
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn);
+     std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, bool fMineWitnessTx=true);
 
 private:
     // utility functions
@@ -186,7 +192,7 @@ private:
     /** Remove confirmed (inBlock) entries from given set */
     void onlyUnconfirmed(CTxMemPool::setEntries& testSet);
     /** Test if a new package would "fit" in the block */
-    bool TestPackage(uint64_t packageSize, unsigned int packageSigOps);
+     bool TestPackage(uint64_t packageSize, unsigned int packageSigOps);
     /** Perform checks on each transaction in a package:
       * locktime
       * These checks should always succeed, and they're here

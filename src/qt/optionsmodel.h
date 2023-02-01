@@ -56,6 +56,10 @@ public:
         PrivateSendMultiSession,// bool
         Listen,                 // bool
         OptionIDRowCount,
+        IpfsUrl,                // QString
+        ToolbarIconsOnly,       // bool
+        ipfsUrl,                // QString
+        
     };
 
     void Init(bool resetSettings = false);
@@ -66,16 +70,21 @@ public:
     bool setData(const QModelIndex & index, const QVariant & value, int role = Qt::EditRole);
     /** Updates current unit in memory, settings and emits displayUnitChanged(newUnit) signal */
     void setDisplayUnit(const QVariant &value);
+    void setDisplayCurrencyIndex(const QVariant &value);
 
     /* Explicit getters */
     bool getHideTrayIcon() { return fHideTrayIcon; }
     bool getMinimizeToTray() { return fMinimizeToTray; }
     bool getMinimizeOnClose() { return fMinimizeOnClose; }
     int getDisplayUnit() { return nDisplayUnit; }
-    QString getThirdPartyTxUrls() { return strThirdPartyTxUrls; }
+    int getDisplayCurrencyIndex() const { return nDisplayCurrencyIndex; }
+    QString getThirdPartyTxUrls() const { return strThirdPartyTxUrls; }
+    QString getIpfsUrl() const { return strIpfsUrl; }
     bool getProxySettings(QNetworkProxy& proxy) const;
     bool getCoinControlFeatures() { return fCoinControlFeatures; }
+    bool getCustomFeeFeatures() const { return fCustomFeeFeatures; }
     bool getShowAdvancedPSUI() { return fShowAdvancedPSUI; }
+    bool getDarkModeEnabled() const { return fDarkModeEnabled; }
     const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
 
     /* Restart flag helper */
@@ -90,9 +99,17 @@ private:
     bool fMinimizeOnClose;
     QString language;
     int nDisplayUnit;
+    int nDisplayCurrencyIndex;
     QString strThirdPartyTxUrls;
+    QString strIpfsUrl;
     bool fCoinControlFeatures;
     bool fShowAdvancedPSUI;
+    
+    /** YERB START*/
+    bool fCustomFeeFeatures;
+    bool fDarkModeEnabled;
+    /** YERB END*/
+
     /* settings that were overridden by command-line */
     QString strOverriddenByCommandLine;
 
@@ -103,6 +120,7 @@ private:
     void checkAndMigrate();
 Q_SIGNALS:
     void displayUnitChanged(int unit);
+    void displayCurrencyIndexChanged(int unit);
     void privateSendRoundsChanged();
     void privateSentAmountChanged();
     void advancedPSUIChanged(bool);

@@ -120,6 +120,15 @@ BITCOIN_CORE_H = \
   addressindex.h \
   spentindex.h \
   addrman.h \
+  assets/assets.h \
+  assets/assetdb.h \
+  assets/assettypes.h \
+  assets/messages.h \
+  assets/myassetsdb.h \
+  assets/restricteddb.h \
+  assets/snapshotrequestdb.h \
+  assets/assetsnapshotdb.h \
+  assets/rewards.h \
   base58.h \
   batchedlogger.h \
   bip39.h \
@@ -280,6 +289,15 @@ libyerbas_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libyerbas_server_a_SOURCES = \
   addrdb.cpp \
   addrman.cpp \
+  assets/assets.cpp \
+  assets/assetdb.cpp \
+  assets/assettypes.cpp \
+  assets/messages.cpp \
+  assets/myassetsdb.cpp \
+  assets/restricteddb.cpp \
+  assets/snapshotrequestdb.cpp \
+  assets/assetsnapshotdb.cpp \
+  assets/rewards.cpp \
   batchedlogger.cpp \
   bloom.cpp \
   blockencodings.cpp \
@@ -335,6 +353,7 @@ libyerbas_server_a_SOURCES = \
   privatesend/privatesend.cpp \
   privatesend/privatesend-server.cpp \
   rest.cpp \
+  rpc/assets.cpp \
   rpc/blockchain.cpp \
   rpc/smartnode.cpp \
   rpc/governance.cpp \

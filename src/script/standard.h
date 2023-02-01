@@ -44,13 +44,22 @@ static const unsigned int MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH;
 
 enum txnouttype
 {
-    TX_NONSTANDARD,
+    TX_NONSTANDARD = 0,
     // 'standard' transaction types:
-    TX_PUBKEY,
-    TX_PUBKEYHASH,
-    TX_SCRIPTHASH,
-    TX_MULTISIG,
-    TX_NULL_DATA,
+    TX_PUBKEY = 1,
+    TX_PUBKEYHASH = 2,
+    TX_SCRIPTHASH = 3,
+    TX_MULTISIG = 4,
+    TX_NULL_DATA = 5, 
+/** YERB START */
+    TX_WITNESS_V0_SCRIPTHASH = 6,
+    TX_WITNESS_V0_KEYHASH = 7,
+
+    TX_NEW_ASSET = 8,
+    TX_REISSUE_ASSET = 9,
+    TX_TRANSFER_ASSET = 10,
+    TX_RESTRICTED_ASSET_DATA = 11, //!< unspendable OP_YERBAS_ASSET script that carries data
+/** YERB END */
 };
 
 class CNoDestination {
@@ -68,6 +77,9 @@ public:
  */
 typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
 
+/** Check whether a CTxDestination is a CNoDestination. */
+bool IsValidDestination(const CTxDestination& dest);
+
 const char* GetTxnOutputType(txnouttype t);
 
 bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet);
@@ -78,5 +90,16 @@ CScript GetFutureScriptForDestination(const CTxDestination& dest, int height);
 CScript GetScriptForDestination(const CTxDestination& dest);
 CScript GetScriptForRawPubKey(const CPubKey& pubkey);
 CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys);
+
+/** Generate a script that contains an address used for qualifier, and restricted assets data transactions */
+CScript GetScriptForNullAssetDataDestination(const CTxDestination &dest);
+
+/**
+ * Generate a pay-to-witness script for the given redeem script. If the redeem
+ * script is P2PK or P2PKH, this returns a P2WPKH script, otherwise it returns a
+ * P2WSH script.
+ */
+CScript GetScriptForWitness(const CScript& redeemscript);
+
 
 #endif // BITCOIN_SCRIPT_STANDARD_H

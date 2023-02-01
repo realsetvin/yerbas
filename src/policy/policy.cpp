@@ -6,7 +6,7 @@
 // NOTE: This file is intended to be customised by the end user, and includes only local node policy logic
 
 #include "policy/policy.h"
-
+#include "consensus/validation.h"
 #include "validation.h"
 #include "coins.h"
 #include "tinyformat.h"
@@ -28,13 +28,27 @@ CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
     if (txout.scriptPubKey.IsUnspendable())
         return 0;
 
-    size_t nSize = GetSerializeSize(txout, SER_DISK, 0)+148u;
+    size_t nSize = GetSerializeSize(txout, SER_DISK, 0);
+    int witnessversion = 0;
+    std::vector<unsigned char> witnessprogram;
+
+    if (txout.scriptPubKey.IsWitnessProgram(witnessversion, witnessprogram)) {
+        // sum the sizes of the parts of a transaction input
+        // with 75% segwit discount applied to the script size.
+        nSize += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
+    } else {
+        nSize += (32 + 4 + 1 + 107 + 4); // the 148 mentioned above
+    }
+
     return dustRelayFeeIn.GetFee(nSize);
 }
 
 bool IsDust(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
-    return (txout.nValue < GetDustThreshold(txout, dustRelayFeeIn));
+    if (txout.scriptPubKey.IsAssetScript())
+        return false;
+    else
+        return (txout.nValue < GetDustThreshold(txout, dustRelayFeeIn));
 }
 
     /**
@@ -87,7 +101,8 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
-    unsigned int sz = GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
+///    unsigned int sz = GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
+    unsigned int sz = GetTransactionWeight(tx);
     if (sz >= MAX_STANDARD_TX_SIZE) {
         reason = "tx-size";
         return false;
@@ -113,6 +128,7 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
     }
 
     unsigned int nDataOut = 0;
+    unsigned int nAssetDataOut = 0;
     txnouttype whichType;
     for (const CTxOut& txout : tx.vout) {
         if (!::IsStandard(txout.scriptPubKey, whichType)) {
@@ -122,6 +138,8 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
 
         if (whichType == TX_NULL_DATA)
             nDataOut++;
+        else if (whichType == TX_RESTRICTED_ASSET_DATA)
+            nAssetDataOut++;
         else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
@@ -134,6 +152,12 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
     // only one OP_RETURN txout is permitted
     if (nDataOut > 1) {
         reason = "multi-op-return";
+        return false;
+    }
+
+    // only one hundred OP_YERBAS_ASSET txout is permitted
+    if (nAssetDataOut > 100) {
+        reason = "tomany-op-yerb-asset";
         return false;
     }
 
@@ -174,5 +198,69 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
     return true;
 }
 
+bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
+{
+    if (tx.IsCoinBase())
+        return true; // Coinbases are skipped
+
+    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    {
+        // We don't care if witness for this input is empty, since it must not be bloated.
+        // If the script is invalid without witness, it would be caught sooner or later during validation.
+        if (tx.vin[i].scriptWitness.IsNull())
+            continue;
+
+        const CTxOut &prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
+
+        // get the scriptPubKey corresponding to this input:
+        CScript prevScript = prev.scriptPubKey;
+
+        if (prevScript.IsPayToScriptHash()) {
+            std::vector <std::vector<unsigned char> > stack;
+            // If the scriptPubKey is P2SH, we try to extract the redeemScript casually by converting the scriptSig
+            // into a stack. We do not check IsPushOnly nor compare the hash as these will be done later anyway.
+            // If the check fails at this stage, we know that this txid must be a bad one.
+            if (!EvalScript(stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE, BaseSignatureChecker(), SIGVERSION_BASE))
+                return false;
+            if (stack.empty())
+                return false;
+            prevScript = CScript(stack.back().begin(), stack.back().end());
+        }
+
+        int witnessversion = 0;
+        std::vector<unsigned char> witnessprogram;
+
+        // Non-witness program must not be associated with any witness
+        if (!prevScript.IsWitnessProgram(witnessversion, witnessprogram))
+            return false;
+
+        // Check P2WSH standard limits
+        if (witnessversion == 0 && witnessprogram.size() == 32) {
+            if (tx.vin[i].scriptWitness.stack.back().size() > MAX_STANDARD_P2WSH_SCRIPT_SIZE)
+                return false;
+            size_t sizeWitnessStack = tx.vin[i].scriptWitness.stack.size() - 1;
+            if (sizeWitnessStack > MAX_STANDARD_P2WSH_STACK_ITEMS)
+                return false;
+            for (unsigned int j = 0; j < sizeWitnessStack; j++) {
+                if (tx.vin[i].scriptWitness.stack[j].size() > MAX_STANDARD_P2WSH_STACK_ITEM_SIZE)
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
 CFeeRate incrementalRelayFee = CFeeRate(DEFAULT_INCREMENTAL_RELAY_FEE);
 CFeeRate dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
+unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
+
+int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost)
+{
+    return (std::max(nWeight, nSigOpCost * nBytesPerSigOp) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR;
+}
+
+int64_t GetVirtualTransactionSize(const CTransaction& tx, int64_t nSigOpCost)
+{
+    return GetVirtualTransactionSize(GetTransactionWeight(tx), nSigOpCost);
+}
+

@@ -23,6 +23,7 @@ class CDeterministicMNList;
 class CDeterministicMNListDiff;
 class uint256;
 class CScheduler;
+class CMessage;
 
 namespace llmq {
     class CChainLockSig;
@@ -76,7 +77,9 @@ protected:
      * Notifies listeners that a block which builds directly on our current tip
      * has been received and connected to the headers tree, though not validated yet */
     virtual void NewPoWValidBlock(const CBlockIndex *pindex, const std::shared_ptr<const CBlock>& block) {};
+
     virtual void BlockFound(const uint256 &hash) {};
+    virtual void NewAssetMessage(const CMessage &message) {};
     friend void ::RegisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
@@ -117,6 +120,7 @@ public:
     void BlockChecked(const CBlock&, const CValidationState&);
     void NewPoWValidBlock(const CBlockIndex *, const std::shared_ptr<const CBlock>&);
     void BlockFound(const uint256 &);
+    void NewAssetMessage(const CMessage&);
 };
 
 CMainSignals& GetMainSignals();

@@ -20,6 +20,10 @@ class SendCoinsRecipient;
 class TransactionView;
 class WalletModel;
 class AddressBookPage;
+class AssetsDialog;
+class CreateAssetDialog;
+class ReissueAssetDialog;
+class RestrictedAssetsDialog;
 
 QT_BEGIN_NAMESPACE
 class QLabel;
@@ -74,6 +78,13 @@ private:
     QLabel *transactionSum;
     const PlatformStyle *platformStyle;
 
+    /** YERB START */
+    AssetsDialog *assetsPage;
+    CreateAssetDialog *createAssetsPage;
+    ReissueAssetDialog *manageAssetsPage;
+    RestrictedAssetsDialog *restrictedAssetsPage;
+    /** YERB END */
+
 public Q_SLOTS:
     /** Switch to overview (home) page */
     void gotoOverviewPage();
@@ -121,6 +132,16 @@ public Q_SLOTS:
     /** User has requested more information about the out of sync state */
     void requestedSyncWarningInfo();
 
+    /** YERB START */
+    /** Switch to assets page */
+
+    void gotoAssetsPage();
+    void gotoCreateAssetsPage();
+    void gotoManageAssetsPage();
+    void gotoRestrictedAssetsPage();
+
+    /** YERB END */
+
 
     /** Update selected YERB amount from transactionview */
     void trxAmount(QString amount);
@@ -134,9 +155,11 @@ Q_SIGNALS:
     /** HD-Enabled status of wallet changed (only possible during startup) */
     void hdEnabledStatusChanged(int hdEnabled);
     /** Notify that a new transaction appeared */
-    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label);
+    void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address, const QString& label, const QString& assetName);
     /** Notify that the out of sync warning icon has been pressed */
     void outOfSyncWarningClicked();
+    /** Show the assets GUI */
+    void checkAssets();
 };
 
 #endif // BITCOIN_QT_WALLETVIEW_H

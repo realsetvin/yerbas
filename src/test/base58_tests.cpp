@@ -122,6 +122,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
     UniValue tests = read_json(std::string(json_tests::base58_keys_valid, json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid)));
     CBitcoinSecret secret;
     CBitcoinAddress addr;
+    CTxDestination destination;
     SelectParams(CBaseChainParams::MAIN);
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
@@ -154,17 +155,26 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
 
             // Private key must be invalid public key
             addr.SetString(exp_base58string);
+            destination = DecodeDestination(exp_base58string);
             BOOST_CHECK_MESSAGE(!addr.IsValid(), "IsValid privkey as pubkey:" + strTest);
+            BOOST_CHECK_MESSAGE(!IsValidDestination(destination), "IsValid privkey as pubkey:" + strTest);
         }
         else
         {
-            std::string exp_addrType = find_value(metadata, "addrType").get_str(); // "script" or "pubkey"
             // Must be valid public key
+            std::string exp_addrType = find_value(metadata, "addrType").get_str(); // "script" or "pubkey"
             BOOST_CHECK_MESSAGE(addr.SetString(exp_base58string), "SetString:" + strTest);
             BOOST_CHECK_MESSAGE(addr.IsValid(), "!IsValid:" + strTest);
             BOOST_CHECK_MESSAGE(addr.IsScript() == (exp_addrType == "script"), "isScript mismatch" + strTest);
             CTxDestination dest = addr.Get();
             BOOST_CHECK_MESSAGE(boost::apply_visitor(TestAddrTypeVisitor(exp_addrType), dest), "addrType mismatch" + strTest);
+
+                // Must be valid public key
+                destination = DecodeDestination(exp_base58string);
+                BOOST_CHECK_MESSAGE(IsValidDestination(destination), "!IsValid:" + strTest);
+                BOOST_CHECK_MESSAGE((boost::get<CScriptID>(&destination) != nullptr) == (exp_addrType == "script"), "isScript mismatch" + strTest);
+                BOOST_CHECK_MESSAGE(boost::apply_visitor(TestAddrTypeVisitor(exp_addrType), destination), "addrType mismatch" + strTest);
+
 
             // Public key must be invalid private key
             secret.SetString(exp_base58string);
@@ -243,9 +253,12 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen)
 // Goal: check that base58 parsing code is robust against a variety of corrupted data
 BOOST_AUTO_TEST_CASE(base58_keys_invalid)
 {
+    BOOST_TEST_MESSAGE("Running Base58 Keys Invalid Test");
+
     UniValue tests = read_json(std::string(json_tests::base58_keys_invalid, json_tests::base58_keys_invalid + sizeof(json_tests::base58_keys_invalid))); // Negative testcases
     CBitcoinSecret secret;
     CBitcoinAddress addr;
+    CTxDestination destination;
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
@@ -258,13 +271,12 @@ BOOST_AUTO_TEST_CASE(base58_keys_invalid)
         std::string exp_base58string = test[0].get_str();
 
         // must be invalid as public and as private key
-        addr.SetString(exp_base58string);
-        BOOST_CHECK_MESSAGE(!addr.IsValid(), "IsValid pubkey:" + strTest);
+        destination = DecodeDestination(exp_base58string);
+        BOOST_CHECK_MESSAGE(!IsValidDestination(destination), "IsValid pubkey:" + strTest);
         secret.SetString(exp_base58string);
         BOOST_CHECK_MESSAGE(!secret.IsValid(), "IsValid privkey:" + strTest);
     }
 }
-
 
 BOOST_AUTO_TEST_SUITE_END()
 
