@@ -64,6 +64,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/thread.hpp>
+#include <script/ismine.h>
 #include <wallet/wallet.h>
 
 #include "assets/assets.h"

@@ -1444,4 +1444,3 @@ UniValue echo(const JSONRPCRequest& request)
 
     return request.params;
 }
-
