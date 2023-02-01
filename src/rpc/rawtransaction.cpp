@@ -43,7 +43,7 @@
 #include <univalue.h>
 
 
-void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry, , const CSpentIndexTxInfo* ptxSpentInfo, bool expanded = false)
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry, const CSpentIndexTxInfo* ptxSpentInfo, bool expanded = false)
 {
     // Call into TxToUniv() in yerbas-common to decode the transaction hex.
     //
