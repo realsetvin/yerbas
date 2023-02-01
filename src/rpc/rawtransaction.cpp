@@ -43,14 +43,14 @@
 #include <univalue.h>
 
 
-void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry, const CSpentIndexTxInfo* ptxSpentInfo, bool expanded = false)
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry, bool expanded = false)
 {
     // Call into TxToUniv() in yerbas-common to decode the transaction hex.
     //
     // Blockchain contextual information (confirmations and blocktime) is not
     // available to code in yerbas-common, so we query them here and push the
     // data into the returned UniValue.
-    TxToUniv(tx, uint256(), entry, ptxSpentInfo, true, RPCSerializationFlags());
+    TxToUniv(tx, uint256(), entry, true, RPCSerializationFlags());
 
     if (expanded) {
         uint256 txid = tx.GetHash();
@@ -227,7 +227,7 @@ UniValue getrawtransaction(const JSONRPCRequest& request)
         return EncodeHexTx(*tx, RPCSerializationFlags());
 
     UniValue result(UniValue::VOBJ);
-    TxToJSON(*tx, hashBlock, result);
+    TxToJSON(*tx, hashBlock, result, true);
     return result;
 }
 
