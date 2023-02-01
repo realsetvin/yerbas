@@ -109,14 +109,6 @@ if BUILD_BITCOIND
   bin_PROGRAMS += yerbasd
 endif
 
-if BUILD_BITCOIN_CLI
-  bin_PROGRAMS += yerbas-cli
-endif
-
-if BUILD_BITCOIN_TX
-  bin_PROGRAMS += yerbas-tx
-endif
-
 if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += yerbas-cli yerbas-tx
 endif
@@ -423,7 +415,6 @@ libyerbas_wallet_a_SOURCES = \
   wallet/feebumper.cpp \
   wallet/fees.cpp \
   wallet/init.cpp \
-
   $(BITCOIN_CORE_H)
 
 # crypto primitives library
