@@ -143,7 +143,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, const C
         if(txDetails)
         {
             UniValue objTx(UniValue::VOBJ);
-            TxToUniv(*tx, uint256(), objTx, ptxSpentInfo, true, RPCSerializationFlags());
+            TxToUniv(*tx, uint256(), objTx, true, RPCSerializationFlags(), ptxSpentInfo);
             bool fLocked = llmq::quorumInstantSendManager->IsLocked(tx->GetHash());
             objTx.push_back(Pair("instantlock", fLocked || chainLock));
             objTx.push_back(Pair("instantlock_internal", fLocked));
@@ -197,7 +197,7 @@ UniValue decodeblockToJSON(const CBlock& block, const CSpentIndexTxInfo* ptxSpen
     for(const auto& tx : block.vtx)
     {
         UniValue objTx(UniValue::VOBJ);
-        TxToUniv(*tx, uint256(), objTx, ptxSpentInfo, true, RPCSerializationFlags());
+        TxToUniv(*tx, uint256(), objTx, true, RPCSerializationFlags(), ptxSpentInfo);
         txs.push_back(objTx);
     }
     result.push_back(Pair("tx", txs));
