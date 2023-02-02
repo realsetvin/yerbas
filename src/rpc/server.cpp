@@ -42,6 +42,37 @@ static RPCTimerInterface* timerInterface = nullptr;
 /* Map of name to timer. */
 static std::map<std::string, std::unique_ptr<RPCTimerBase> > deadlineTimers;
 
+struct RPCCommandExecutionInfo
+{
+    std::string method;
+    int64_t start;
+};
+
+struct RPCServerInfo
+{
+    std::mutex mtx;
+    std::list<RPCCommandExecutionInfo> active_commands GUARDED_BY(mtx);
+};
+
+static RPCServerInfo g_rpc_server_info;
+
+struct RPCCommandExecution
+{
+    std::list<RPCCommandExecutionInfo>::iterator it;
+    explicit RPCCommandExecution(const std::string& method)
+    {
+        g_rpc_server_info.mtx.lock();
+        it = g_rpc_server_info.active_commands.insert(g_rpc_server_info.active_commands.end(), {method, GetTimeMicros()});
+        g_rpc_server_info.mtx.unlock();
+    }
+    ~RPCCommandExecution()
+    {
+        g_rpc_server_info.mtx.lock();
+        g_rpc_server_info.active_commands.erase(it);
+        g_rpc_server_info.mtx.unlock();
+    }
+};
+
 static struct CRPCSignals
 {
     boost::signals2::signal<void ()> Started;
@@ -338,6 +369,7 @@ static const CRPCCommand vRPCCommands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
     /* Overall control/query calls */
+    { "control",            "getrpcinfo",             &getrpcinfo,             {}  },
     { "control",            "help",                   &help,                   true,  {"command"}  },
     { "control",            "stop",                   &stop,                   true,  {"wait"}  },
     { "control",            "uptime",                 &uptime,                 true,  {}  },
