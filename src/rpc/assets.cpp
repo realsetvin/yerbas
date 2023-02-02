@@ -3033,3 +3033,54 @@ UniValue purgesnapshot(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+static const CRPCCommand commands[] =       
+{ //  category    name                          actor (function)             argNames
+  //  ----------- ------------------------      -----------------------      ----------
+#ifdef ENABLE_WALLET
+    { "assets",   "issue",                      &issue,                      {"asset_name","qty","to_address","change_address","units","reissuable","has_ipfs","ipfs_hash"} },
+    { "assets",   "issueunique",                &issueunique,                {"root_name", "asset_tags", "ipfs_hashes", "to_address", "change_address"}},
+    { "assets",   "listmyassets",               &listmyassets,               {"asset", "verbose", "count", "start", "confs"}},
+#endif
+    { "assets",   "listassetbalancesbyaddress", &listassetbalancesbyaddress, {"address", "onlytotal", "count", "start"} },
+    { "assets",   "getassetdata",               &getassetdata,               {"asset_name"}},
+    { "assets",   "listaddressesbyasset",       &listaddressesbyasset,       {"asset_name", "onlytotal", "count", "start"}},
+#ifdef ENABLE_WALLET
+    { "assets",   "transferfromaddress",        &transferfromaddress,        {"asset_name", "from_address", "qty", "to_address", "message", "expire_time", "rvn_change_address", "asset_change_address"}},
+    { "assets",   "transferfromaddresses",      &transferfromaddresses,      {"asset_name", "from_addresses", "qty", "to_address", "message", "expire_time", "rvn_change_address", "asset_change_address"}},
+    { "assets",   "transfer",                   &transfer,                   {"asset_name", "qty", "to_address", "message", "expire_time", "change_address", "asset_change_address"}},
+    { "assets",   "reissue",                    &reissue,                    {"asset_name", "qty", "to_address", "change_address", "reissuable", "new_units", "new_ipfs"}},
+#endif
+    { "assets",   "listassets",                 &listassets,                 {"asset", "verbose", "count", "start"}},
+    { "assets",   "getcacheinfo",               &getcacheinfo,               {}},
+
+#ifdef ENABLE_WALLET
+    { "restricted assets",   "transferqualifier",          &transferqualifier,          {"qualifier_name", "qty", "to_address", "change_address", "message", "expire_time"}},
+    { "restricted assets",   "issuerestrictedasset",       &issuerestrictedasset,       {"asset_name","qty","verifier","to_address","change_address","units","reissuable","has_ipfs","ipfs_hash"} },
+    { "restricted assets",   "issuequalifierasset",        &issuequalifierasset,        {"asset_name","qty","to_address","change_address","has_ipfs","ipfs_hash"} },
+    { "restricted assets",   "reissuerestrictedasset",     &reissuerestrictedasset,     {"asset_name", "qty", "change_verifier", "new_verifier", "to_address", "change_address", "new_units", "reissuable", "new_ipfs"}},
+    { "restricted assets",   "addtagtoaddress",            &addtagtoaddress,            {"tag_name", "to_address", "change_address", "asset_data"}},
+    { "restricted assets",   "removetagfromaddress",       &removetagfromaddress,       {"tag_name", "to_address", "change_address", "asset_data"}},
+    { "restricted assets",   "freezeaddress",              &freezeaddress,              {"asset_name", "address", "change_address", "asset_data"}},
+    { "restricted assets",   "unfreezeaddress",            &unfreezeaddress,            {"asset_name", "address", "change_address", "asset_data"}},
+    { "restricted assets",   "freezerestrictedasset",      &freezerestrictedasset,      {"asset_name", "change_address", "asset_data"}},
+    { "restricted assets",   "unfreezerestrictedasset",    &unfreezerestrictedasset,    {"asset_name", "change_address", "asset_data"}},
+#endif
+    { "restricted assets",   "listaddressesfortag",        &listaddressesfortag,        {"tag_name"}},
+    { "restricted assets",   "listtagsforaddress",         &listtagsforaddress,         {"address"}},
+    { "restricted assets",   "listaddressrestrictions",    &listaddressrestrictions,    {"address"}},
+    { "restricted assets",   "listglobalrestrictions",     &listglobalrestrictions,     {}},
+    { "restricted assets",   "getverifierstring",          &getverifierstring,          {"restricted_name"}},
+    { "restricted assets",   "checkaddresstag",            &checkaddresstag,            {"address", "tag_name"}},
+    { "restricted assets",   "checkaddressrestriction",    &checkaddressrestriction,    {"address", "restricted_name"}},
+    { "restricted assets",   "checkglobalrestriction",     &checkglobalrestriction,     {"restricted_name"}},
+    { "restricted assets",   "isvalidverifierstring",      &isvalidverifierstring,      {"verifier_string"}},
+
+    { "assets",   "getsnapshot",                &getsnapshot,                {"asset_name", "block_height"}},
+    { "assets",   "purgesnapshot",              &purgesnapshot,              {"asset_name", "block_height"}},
+};
+
+void RegisterAssetRPCCommands(CRPCTable &t)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
+}
