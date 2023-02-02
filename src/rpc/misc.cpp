@@ -1458,11 +1458,11 @@ static const CRPCCommand commands[] =
     { "blockchain",         "getspentinfo",           &getspentinfo,           false, {"json"} },
 
     /* Address index */
-    { "addressindex",       "getaddressmempool",      &getaddressmempool,      true,  {"addresses"}  },
-    { "addressindex",       "getaddressutxos",        &getaddressutxos,        false, {"addresses"} },
-    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false, {"addresses"} },
-    { "addressindex",       "getaddresstxids",        &getaddresstxids,        false, {"addresses"} },
-    { "addressindex",       "getaddressbalance",      &getaddressbalance,      false, {"addresses"} },
+    { "addressindex",       "getaddressmempool",      &getaddressmempool,      {"addresses","includeAssets"} },
+    { "addressindex",       "getaddressutxos",        &getaddressutxos,        {"addresses"} },
+    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       {"addresses"} },
+    { "addressindex",       "getaddresstxids",        &getaddresstxids,        {"addresses","includeAssets"} },
+    { "addressindex",       "getaddressbalance",      &getaddressbalance,      {"addresses","includeAssets"} },
 
     /* Yerbas features */
     { "yerbas",               "mnsync",                 &mnsync,                 true,  {} },

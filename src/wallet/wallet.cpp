@@ -46,21 +46,24 @@
 
 #include <assert.h>
 
-#include "assets/assets.h"
-
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/thread.hpp>
-
 #include <random>
 #include <tinyformat.h>
+#include "assets/assets.h"
 
 std::vector<CWalletRef> vpwallets;
 /** Transaction fee set by the user */
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
 unsigned int nTxConfirmTarget = DEFAULT_TX_CONFIRM_TARGET;
 bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
+bool fWalletRbf = DEFAULT_WALLET_RBF;
 
 const char * DEFAULT_WALLET_DAT = "wallet.dat";
+const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
+
+std::string my_words;
+std::string my_passphrase;
 
 /**
  * Fees smaller than this (in duffs) are considered zero fee (for transaction creation)
