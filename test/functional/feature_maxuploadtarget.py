@@ -93,6 +93,7 @@ class MaxUploadTest(BitcoinTestFramework):
 
         max_bytes_per_day = 200*1024*1024
         daily_buffer = 144 * MAX_BLOCK_SIZE
+        max_block_serialized_size = 8000000  # This is MAX_BLOCK_SERIALIZED_SIZE_RIP2
         max_bytes_available = max_bytes_per_day - daily_buffer
         success_count = max_bytes_available // old_block_size
 

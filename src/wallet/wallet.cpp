@@ -4657,6 +4657,17 @@ bool CWallet::CreateTransactionWithReissueAsset(const std::vector<CRecipient>& v
     return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, false, asset, destination, false, true, reissueAsset, assetType, sign);
 }
 
+bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+                                        std::string& strFailReason, const CCoinControl& coin_control, bool sign)
+{
+
+    CNewAsset asset;
+    CReissueAsset reissueAsset;
+    CTxDestination destination;
+    AssetType assetType = AssetType::INVALID;
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coin_control, false,  asset, destination, false, false, reissueAsset, assetType, sign);
+}
+
 bool CWallet::CreateTransactionAll(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey,
                                    CAmount& nFeeRet, int& nChangePosInOut, std::string& strFailReason,
                                    const CCoinControl& coin_control, bool fNewAsset, const CNewAsset& asset,
