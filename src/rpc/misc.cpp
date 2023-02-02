@@ -1445,8 +1445,6 @@ UniValue echo(const JSONRPCRequest& request)
     return request.params;
 }
 
-}
-
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
