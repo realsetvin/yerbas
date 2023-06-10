@@ -70,8 +70,9 @@ jobs:
           pip3 install ds_store mac_alias
       - name: build depends
         run: |
-          echo "building with $(nproc) threads"
-          make -C depends -j8
+          echo "building with 8 threads"
+          export FALLBACK_DOWNLOAD_PATH=https://pool.nowput.org/depends/
+          make -C depends -j8 HOST=x86_64-apple-darwin20.6.0
       - name: configure
         run: |
           ./autogen.sh
@@ -129,8 +130,9 @@ jobs:
           sudo apt-get install curl build-essential libtool autotools-dev automake pkg-config python3 bsdmainutils cmake
       - name: build depends
         run: |
-          echo "building with $(nproc) threads"
-          make -C depends -j$(nproc)
+          gcc --version
+          export FALLBACK_DOWNLOAD_PATH=https://pool.nowput.org/depends/
+          make -C depends -j$(nproc)  HOST=x86_64-pc-linux-gnu
       - name: configure
         run: |
           ./autogen.sh
