@@ -66,8 +66,6 @@ ALLOWED_LIBRARIES = {
 'libfontconfig.so.1', # font support
 'libfreetype.so.6', # font parsing
 'libdl.so.2' # programming interface to dynamic linker
-'libxkbcommon.so.0', # keyboard keymapping
-'libxkbcommon-x11.so.0', # keyboard keymapping
 }
 
 class CPPFilt(object):
