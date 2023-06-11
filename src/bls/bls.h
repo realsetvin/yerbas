@@ -17,10 +17,6 @@
 #include <bls-dash/elements.hpp>
 #include <bls-dash/schemes.hpp>
 #include <bls-dash/threshold.hpp>
-#include <chiabls/bls.hpp>
-#include <chiabls/privatekey.hpp>
-#include <chiabls/publickey.hpp>
-#include <chiabls/signature.hpp>
 #undef DOUBLE
 
 #include <array>

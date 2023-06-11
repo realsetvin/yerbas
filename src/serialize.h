@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "prevector.h"
+#include <span.h>
 
 static const unsigned int MAX_SIZE = 0x02000000;
 
@@ -192,6 +193,8 @@ template<typename Stream> inline void Serialize(Stream& s, int64_t a ) { ser_wri
 template<typename Stream> inline void Serialize(Stream& s, uint64_t a) { ser_writedata64(s, a); }
 template<typename Stream> inline void Serialize(Stream& s, float a   ) { ser_writedata32(s, ser_float_to_uint32(a)); }
 template<typename Stream> inline void Serialize(Stream& s, double a  ) { ser_writedata64(s, ser_double_to_uint64(a)); }
+template<typename Stream> inline void Serialize(Stream& s, const Span<const unsigned char>& span) { s.write(CharCast(span.data()), span.size()); }
+template<typename Stream> inline void Serialize(Stream& s, const Span<unsigned char>& span) { s.write(CharCast(span.data()), span.size()); }
 
 template<typename Stream> inline void Unserialize(Stream& s, char& a    ) { a = ser_readdata8(s); } // TODO Get rid of bare char
 template<typename Stream> inline void Unserialize(Stream& s, int8_t& a  ) { a = ser_readdata8(s); }
@@ -204,6 +207,7 @@ template<typename Stream> inline void Unserialize(Stream& s, int64_t& a ) { a = 
 template<typename Stream> inline void Unserialize(Stream& s, uint64_t& a) { a = ser_readdata64(s); }
 template<typename Stream> inline void Unserialize(Stream& s, float& a   ) { a = ser_uint32_to_float(ser_readdata32(s)); }
 template<typename Stream> inline void Unserialize(Stream& s, double& a  ) { a = ser_uint64_to_double(ser_readdata64(s)); }
+template<typename Stream> inline void Unserialize(Stream& s, Span<unsigned char>& span) { s.read(CharCast(span.data()), span.size()); }
 
 template<typename Stream> inline void Serialize(Stream& s, bool a)    { char f=a; ser_writedata8(s, f); }
 template<typename Stream> inline void Unserialize(Stream& s, bool& a) { char f=ser_readdata8(s); a=f; }
@@ -367,7 +371,6 @@ I ReadVarInt(Stream& is)
     }
 }
 
-#define FLATDATA(obj) REF(CFlatData((char*)&(obj), (char*)&(obj) + sizeof(obj)))
 #define FIXEDBITSET(obj, size) REF(CFixedBitSet(REF(obj), (size)))
 #define DYNBITSET(obj) REF(CDynamicBitSet(REF(obj)))
 #define FIXEDVARINTSBITSET(obj, size) REF(CFixedVarIntsBitSet(REF(obj), (size)))
@@ -379,42 +382,7 @@ I ReadVarInt(Stream& is)
 /** 
  * Wrapper for serializing arrays and POD.
  */
-class CFlatData
-{
-protected:
-    char* pbegin;
-    char* pend;
-public:
-    CFlatData(void* pbeginIn, void* pendIn) : pbegin((char*)pbeginIn), pend((char*)pendIn) { }
-    template <class T, class TAl>
-    explicit CFlatData(std::vector<T,TAl> &v)
-    {
-        pbegin = (char*)v.data();
-        pend = (char*)(v.data() + v.size());
-    }
-    template <unsigned int N, typename T, typename S, typename D>
-    explicit CFlatData(prevector<N, T, S, D> &v)
-    {
-        pbegin = (char*)v.data();
-        pend = (char*)(v.data() + v.size());
-    }
-    char* begin() { return pbegin; }
-    const char* begin() const { return pbegin; }
-    char* end() { return pend; }
-    const char* end() const { return pend; }
 
-    template<typename Stream>
-    void Serialize(Stream& s) const
-    {
-        s.write(pbegin, pend - pbegin);
-    }
-
-    template<typename Stream>
-    void Unserialize(Stream& s)
-    {
-        s.read(pbegin, pend - pbegin);
-    }
-};
 
 class CFixedBitSet
 {
